@@ -1,0 +1,122 @@
+<%- include('../partials/admin-top') %>
+<%
+  const BROADCAST_STATUS = { queued: ['कतार में', 'gold'], running: ['भेजा जा रहा है', 'blue'], paused: ['रुका हुआ', 'gray'], done: ['पूर्ण', 'green'], cancelled: ['रद्द', 'red'] };
+  const gwLabel = { connected: 'जुड़ा हुआ', connecting: 'जुड़ रहा है', qr: 'QR स्कैन बाकी', disconnected: 'जुड़ा नहीं', disabled: 'बंद' };
+%>
+
+<div class="grid cols-4" style="margin-bottom:22px">
+  <a class="stat-card" href="/admin/members?category=pramukh">
+    <span class="si maroon"><%- icon('award') %></span>
+    <span><strong><%= counts.pramukh %></strong><span>प्रमुख</span></span>
+  </a>
+  <a class="stat-card" href="/admin/members?category=padadhikari">
+    <span class="si"><%- icon('shield') %></span>
+    <span><strong><%= counts.padadhikari %></strong><span>पदाधिकारी</span></span>
+  </a>
+  <a class="stat-card" href="/admin/members?category=sadasya">
+    <span class="si green"><%- icon('users') %></span>
+    <span><strong><%= counts.sadasya %></strong><span>सदस्य</span></span>
+  </a>
+  <a class="stat-card" href="/admin/applications">
+    <span class="si blue"><%- icon('user-check') %></span>
+    <span><strong><%= badges.applications %></strong><span>लंबित आवेदन</span></span>
+  </a>
+</div>
+
+<div class="grid cols-3" style="margin-bottom:22px">
+  <a class="card card-body quick" href="/admin/certificates">
+    <h3><%- icon('printer') %> प्रमाण पत्र प्रिंट करें</h3>
+    <p class="muted small" style="margin:0">अब तक <b><%= certsIssued %></b> सदस्यों के प्रमाण पत्र छपे। प्री-प्रिंटेड शीट पर नाम व हस्ताक्षर छापें।</p>
+  </a>
+  <a class="card card-body quick" href="/admin/whatsapp">
+    <h3><%- icon('whatsapp') %> व्हाट्सऐप प्रसारण</h3>
+    <p class="muted small" style="margin:0">गेटवे: <span class="wa-dot <%= gateway.status %>"></span> <b><%= gwLabel[gateway.status] || gateway.status %></b> — सभी सदस्यों, मंडल या समिति को संदेश भेजें।</p>
+  </a>
+  <a class="card card-body quick" href="/admin/members">
+    <h3><%- icon('download') %> सदस्य सूची निर्यात</h3>
+    <p class="muted small" style="margin:0">कुल <b><%= counts.all %></b> स्वीकृत सदस्य — CSV या Excel में डाउनलोड करें।</p>
+  </a>
+</div>
+
+<div class="grid cols-2">
+  <section class="card">
+    <div class="card-head">
+      <h2><%- icon('user-check') %> नए सदस्यता आवेदन</h2>
+      <div class="actions"><a class="btn btn-outline btn-sm" href="/admin/applications">सभी देखें <%- icon('arrow-right') %></a></div>
+    </div>
+    <div class="card-body tight">
+      <% if (!recent.length) { %>
+        <div class="empty-state"><%- icon('check') %><p>कोई लंबित आवेदन नहीं है।</p></div>
+      <% } else { %>
+        <table class="table">
+          <tbody>
+          <% recent.forEach((m) => { %>
+            <tr>
+              <td>
+                <div class="who-cell">
+                  <% if (m.photo) { %><img class="thumb round" src="<%= m.photo %>" alt=""><% } else { %><span class="thumb round"><%= initials(m.name) %></span><% } %>
+                  <div><div class="cell-main"><%= m.salutation || '' %> <%= m.name %></div><div class="cell-sub"><%= m.application_no %> · <%= m.mandal_name || '—' %> · <%= m.city || '' %></div></div>
+                </div>
+              </td>
+              <td class="muted small nowrap"><%= relativeTime(m.created_at) %></td>
+              <td><a class="btn btn-primary btn-sm" href="/admin/applications/<%= m.id %>">समीक्षा</a></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </section>
+
+  <div>
+    <section class="card">
+      <div class="card-head">
+        <h2><%- icon('send') %> हाल के प्रसारण</h2>
+        <div class="actions"><a class="btn btn-outline btn-sm" href="/admin/whatsapp">नया प्रसारण</a></div>
+      </div>
+      <div class="card-body tight">
+        <% if (!broadcasts.length) { %>
+          <div class="empty-state"><%- icon('message-circle') %><p>अभी तक कोई प्रसारण नहीं भेजा गया।</p></div>
+        <% } else { %>
+          <table class="table">
+            <tbody>
+            <% broadcasts.forEach((b) => { const st = BROADCAST_STATUS[b.status] || [b.status, 'gray']; %>
+              <tr>
+                <td><div class="cell-main"><%= b.target_label %></div><div class="cell-sub"><%= formatDate(b.created_at, 'datetime') %></div></td>
+                <td class="nowrap small"><%= b.sent %>/<%= b.total %></td>
+                <td><span class="badge <%= st[1] %>"><%= st[0] %></span></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2><%- icon('calendar') %> आगामी आयोजन</h2>
+        <div class="actions"><a class="btn btn-outline btn-sm" href="/admin/r/events/new"><%- icon('plus') %> जोड़ें</a></div>
+      </div>
+      <div class="card-body tight">
+        <% if (!upcoming.length) { %>
+          <div class="empty-state"><%- icon('calendar') %><p>कोई आगामी आयोजन नहीं।</p></div>
+        <% } else { %>
+          <table class="table">
+            <tbody>
+            <% upcoming.forEach((e) => { %>
+              <tr>
+                <td><div class="cell-main"><%= e.title %></div><div class="cell-sub"><%= e.location || '' %></div></td>
+                <td class="nowrap small"><%= formatDate(e.event_date, 'long') %></td>
+                <td><a class="btn btn-outline btn-sm" href="/admin/r/events/<%= e.id %>/edit"><%- icon('edit') %></a></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </section>
+  </div>
+</div>
+
+<%- include('../partials/admin-bottom') %>

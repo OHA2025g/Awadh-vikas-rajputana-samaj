@@ -1,0 +1,94 @@
+<%- include('../partials/admin-top') %>
+<%
+  const input = (name, label, opts = {}) => `
+    <div class="field ${opts.span || ''}">
+      <label for="f-${name}">${label}</label>
+      <input type="${opts.type || 'text'}" id="f-${name}" name="${name}" value="${String(s[name] ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" ${opts.attrs || ''}>
+      ${opts.hint ? `<div class="hint">${opts.hint}</div>` : ''}
+    </div>`;
+  const area = (name, label, rows = 3) => `
+    <div class="field span-all">
+      <label for="f-${name}">${label}</label>
+      <textarea id="f-${name}" name="${name}" rows="${rows}">${String(s[name] ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</textarea>
+    </div>`;
+%>
+
+<form method="post" action="/admin/site" enctype="multipart/form-data">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <section class="card">
+    <div class="card-head"><h2><%- icon('flag') %> संस्था की पहचान</h2></div>
+    <div class="card-body grid cols-3">
+      <%- input('org_name', 'संस्था का नाम (हिंदी)', { attrs: 'required maxlength="200"' }) %>
+      <%- input('org_name_en', 'संस्था का नाम (अंग्रेज़ी)') %>
+      <%- input('city', 'शहर') %>
+      <%- input('tagline', 'टैगलाइन', { hint: 'हेडर में नाम के नीचे' }) %>
+      <%- input('slogan', 'नारा / स्लोगन') %>
+      <%- input('reg_no', 'रजि. नंबर (जैसे: पुणे/०००४२८/२०२५)') %>
+      <%- input('established', 'स्थापना वर्ष') %>
+      <%- input('member_prefix', 'सदस्य क्रमांक उपसर्ग', { attrs: 'maxlength="10" pattern="[A-Za-z0-9]+"', hint: 'जैसे ARVS → ARVS-0001 (केवल अंग्रेज़ी अक्षर/अंक)' }) %>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2><%- icon('image') %> लोगो एवं मुखपृष्ठ (Hero)</h2></div>
+    <div class="card-body grid cols-2">
+      <div class="field">
+        <span class="label">लोगो</span>
+        <div class="img-field">
+          <img id="logo-prev" src="<%= s.logo %>" alt="" style="object-fit:contain;background:#fff">
+          <div class="stack" style="gap:6px">
+            <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" data-preview="#logo-prev">
+            <label class="check small"><input type="checkbox" name="reset_logo" value="1"> डिफ़ॉल्ट लोगो पर लौटें</label>
+          </div>
+        </div>
+        <div class="hint">पारदर्शी PNG, वर्गाकार (कम से कम 400×400) सबसे अच्छा। यही लोगो प्रमाण पत्र डिज़ाइन में भी उपयोग होता है।</div>
+      </div>
+      <div class="field">
+        <span class="label">मुखपृष्ठ पृष्ठभूमि चित्र</span>
+        <div class="img-field">
+          <img id="hero-prev" src="<%= s.hero_image %>" alt="">
+          <div class="stack" style="gap:6px">
+            <input type="file" name="hero_image" accept="image/png,image/jpeg,image/webp" data-preview="#hero-prev">
+            <label class="check small"><input type="checkbox" name="reset_hero_image" value="1"> डिफ़ॉल्ट चित्र पर लौटें</label>
+          </div>
+        </div>
+        <div class="hint">चौड़ा चित्र (1920×1080) उपयुक्त है।</div>
+      </div>
+      <%- input('hero_badge', 'हीरो बैज पाठ') %>
+      <%- input('hero_title', 'हीरो शीर्षक') %>
+      <%- area('hero_subtitle', 'हीरो उपशीर्षक', 2) %>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2><%- icon('phone') %> संपर्क एवं सोशल मीडिया</h2></div>
+    <div class="card-body grid cols-3">
+      <%- input('phone', 'फ़ोन') %>
+      <%- input('email', 'ईमेल', { type: 'email' }) %>
+      <%- input('whatsapp', 'व्हाट्सऐप नंबर (वेबसाइट बटन हेतु)', { hint: 'देश कोड सहित, जैसे 919800000000' }) %>
+      <%- input('facebook', 'Facebook लिंक', { type: 'text', attrs: 'placeholder="https://facebook.com/…"' }) %>
+      <%- input('instagram', 'Instagram लिंक', { attrs: 'placeholder="https://instagram.com/…"' }) %>
+      <%- input('youtube', 'YouTube लिंक', { attrs: 'placeholder="https://youtube.com/…"' }) %>
+      <%- area('address', 'कार्यालय का पता', 2) %>
+      <div class="field span-all">
+        <label for="f-map_embed">Google मानचित्र एम्बेड</label>
+        <input type="text" id="f-map_embed" name="map_embed" value="<%= s.map_embed %>" placeholder='Google Maps → Share → Embed a map → कोड यहाँ पेस्ट करें'>
+        <div class="hint">पूरा &lt;iframe&gt; कोड या केवल embed URL पेस्ट करें — केवल Google Maps के लिंक स्वीकार होते हैं।</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2><%- icon('layout') %> फ़ुटर एवं सामुदायिक मंच</h2></div>
+    <div class="card-body grid cols-2">
+      <%- area('footer_about', 'फ़ुटर में संस्था परिचय', 3) %>
+      <label class="check span-all"><input type="checkbox" name="wall_member_posts" value="1" <%= s.wall_member_posts ? 'checked' : '' %>> सदस्यों को सामुदायिक मंच पर पोस्ट भेजने दें (एडमिन स्वीकृति के बाद प्रकाशित)</label>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary btn-lg" type="submit"><%- icon('save') %> सेटिंग सहेजें</button>
+    </div>
+  </section>
+</form>
+
+<%- include('../partials/admin-bottom') %>

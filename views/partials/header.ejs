@@ -1,0 +1,54 @@
+<%- include('head') %>
+<div class="topbar">
+  <div class="container">
+    <div class="topbar-contact">
+      <% if (site.phone) { %><a href="<%= telHref(site.phone) %>"><%- icon('phone') %> <%= site.phone %></a><% } %>
+      <% if (site.email) { %><a href="mailto:<%= site.email %>"><%- icon('mail') %> <%= site.email %></a><% } %>
+      <span><%- icon('map-pin') %> <%= site.city %></span>
+    </div>
+    <div class="topbar-social">
+      <span><%= site.tagline %></span>
+      <% if (site.facebook) { %><a href="<%= site.facebook %>" target="_blank" rel="noopener" aria-label="Facebook"><%- icon('facebook') %></a><% } %>
+      <% if (site.instagram) { %><a href="<%= site.instagram %>" target="_blank" rel="noopener" aria-label="Instagram"><%- icon('instagram') %></a><% } %>
+      <% if (site.youtube) { %><a href="<%= site.youtube %>" target="_blank" rel="noopener" aria-label="YouTube"><%- icon('youtube') %></a><% } %>
+    </div>
+  </div>
+</div>
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="/">
+      <img src="<%= site.logo %>" alt="<%= site.org_name %> लोगो">
+      <span>
+        <span class="brand-name"><%= site.org_name %></span>
+        <span class="brand-sub">रजि. नं. <%= site.reg_no %> • <%= site.city %></span>
+      </span>
+    </a>
+    <button class="nav-toggle" type="button" aria-label="मेनू खोलें" data-nav-open><%- icon('menu') %></button>
+    <nav class="main-nav" id="main-nav" aria-label="मुख्य मेनू">
+      <button class="icon-btn nav-close" type="button" aria-label="मेनू बंद करें" data-nav-close><%- icon('x') %></button>
+      <% const navItems = [
+           ['/', 'मुखपृष्ठ'],
+           ['/#about', 'परिचय'],
+           ['/#leadership', 'नेतृत्व'],
+           ['/events', 'गतिविधियाँ'],
+           ['/directory', 'सदस्य सूची'],
+           ['/wall', 'सामुदायिक मंच'],
+           ['/donations', 'दान'],
+         ].concat(navPages.map((p) => ['/page/' + p.slug, p.nav_label || p.title]))
+          .concat([['/#contact', 'संपर्क']]); %>
+      <% for (const [href, label] of navItems) { %>
+        <a class="nav-link <%= currentPath === href ? 'active' : '' %>" href="<%= href %>"><%= label %></a>
+      <% } %>
+      <div class="nav-actions">
+        <a class="btn btn-primary btn-sm" href="/join"><%- icon('user-check') %> सदस्य बनें</a>
+        <% if (admin) { %>
+          <a class="btn btn-outline btn-sm" href="/admin"><%- icon('grid') %> एडमिन पैनल</a>
+        <% } else { %>
+          <a class="btn btn-outline btn-sm" href="/admin/login"><%- icon('log-in') %> एडमिन लॉगिन</a>
+        <% } %>
+      </div>
+    </nav>
+    <div class="nav-backdrop" data-nav-close></div>
+  </div>
+</header>
+<main>

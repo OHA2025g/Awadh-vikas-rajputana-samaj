@@ -1,0 +1,31 @@
+﻿{
+  "name": "awadh-rajput-vikas-sangh",
+  "version": "1.0.0",
+  "private": true,
+  "description": "अवध राजपूत विकास संघ — सामुदायिक वेबसाइट, सदस्य निर्देशिका, प्रमाण पत्र प्रिंटर और एडमिन पैनल",
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^11.10.0",
+    "cookie-session": "^2.1.1",
+    "dotenv": "^17.2.0",
+    "ejs": "^3.1.10",
+    "exceljs": "^4.4.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.0",
+    "helmet": "^8.1.0",
+    "multer": "^2.0.2",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4",
+    "sanitize-html": "^2.17.0"
+  }
+}

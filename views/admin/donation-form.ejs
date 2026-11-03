@@ -1,0 +1,91 @@
+<%- include('../partials/admin-top') %>
+<% const isNew = !d.id; %>
+
+<p><a href="/admin/donations<%= d.category ? '?category=' + d.category : '' %>"><%- icon('chevron-left') %> दान एवं भुगतान</a></p>
+
+<% if (errors.length) { %>
+  <div class="flash error"><%- icon('alert') %> <span><%= errors.join(' ') %></span></div>
+<% } %>
+
+<form class="card" method="post" action="<%= isNew ? '/admin/donations' : '/admin/donations/' + d.id %>" id="donation-form">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <div class="card-head"><h2><%- icon(isNew ? 'plus' : 'edit') %> <%= pageTitle %></h2></div>
+  <div class="card-body grid cols-2">
+    <div class="field span-all">
+      <label for="mp-input">सदस्य <span class="req">*</span></label>
+      <div class="member-picker" data-member-picker="/admin/donations/members">
+        <input type="hidden" name="member_id" value="<%= d.member_id || '' %>">
+        <div class="mp-selected" data-mp-selected <%= d.name ? '' : 'hidden' %>>
+          <span class="thumb round" data-mp-initials><%= initials(d.name) %></span>
+          <div>
+            <div class="cell-main" data-mp-name><%= d.name %></div>
+            <div class="cell-sub" data-mp-sub><%= d.member_no || (d.member_id ? '' : 'सदस्य रिकॉर्ड हटाया जा चुका है — नाम सुरक्षित है') %></div>
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" data-mp-change><%- icon('refresh') %> सदस्य बदलें</button>
+        </div>
+        <div class="mp-search" data-mp-search <%= d.name ? 'hidden' : '' %>>
+          <span class="mp-search-ic"><%- icon('search') %></span>
+          <input type="search" id="mp-input" placeholder="नाम, सदस्य क्रमांक या शहर लिखें…" autocomplete="off"
+                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="mp-list">
+          <ul class="mp-list" id="mp-list" role="listbox" hidden></ul>
+        </div>
+        <div class="hint">केवल स्वीकृत सदस्यों में से चुनें। सूची खोलने के लिए बॉक्स पर क्लिक करें या नाम लिखें।</div>
+        <div class="flash warn mp-warn" data-mp-lifetime hidden><%- icon('info') %> <span>इस सदस्य का आजीवन सदस्यता शुल्क पहले से दर्ज है।</span></div>
+      </div>
+    </div>
+
+    <div class="field span-all">
+      <span class="label">श्रेणी <span class="req">*</span></span>
+      <div class="checklist choice-chips" role="radiogroup" aria-label="श्रेणी">
+        <% DONATION_CATEGORIES.forEach((c) => { %>
+          <label><input type="radio" name="category" value="<%= c.key %>" <%= d.category === c.key ? 'checked' : '' %> required> <%- icon(c.icon) %> <%= c.label %></label>
+        <% }) %>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f-amount">राशि (₹) <span class="req">*</span></label>
+      <div class="input-prefix">
+        <span>₹</span>
+        <input type="text" id="f-amount" name="amount" value="<%= d.amount %>" inputmode="decimal" maxlength="15" placeholder="जैसे 1100" required pattern="[0-9,]+(\.[0-9]{1,2})?">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f-paid-on">भुगतान की तिथि <span class="req">*</span></label>
+      <input type="date" id="f-paid-on" name="paid_on" value="<%= d.paid_on %>" max="<%= today %>" required>
+    </div>
+
+    <div class="field span-all">
+      <span class="label">भुगतान प्रकार <span class="req">*</span></span>
+      <div class="checklist choice-chips" role="radiogroup" aria-label="भुगतान प्रकार">
+        <% PAYMENT_MODES.forEach((m) => { %>
+          <label><input type="radio" name="payment_mode" value="<%= m.key %>" <%= d.payment_mode === m.key ? 'checked' : '' %> required> <%= m.label %></label>
+        <% }) %>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f-reference">लेन-देन संदर्भ संख्या</label>
+      <input type="text" id="f-reference" name="reference" value="<%= d.reference || '' %>" maxlength="100" placeholder="रसीद / UTR / चेक नंबर">
+      <div class="hint" data-ref-hint>नकद हेतु रसीद क्रमांक, UPI/ऑनलाइन हेतु UTR या ट्रांज़ैक्शन ID, चेक हेतु चेक नंबर व बैंक।</div>
+    </div>
+
+    <div class="field">
+      <label for="f-details">लेन-देन विवरण / टिप्पणी</label>
+      <input type="text" id="f-details" name="details" value="<%= d.details || '' %>" maxlength="200" placeholder="जैसे: होली मिलन समारोह 2026 हेतु">
+      <div class="hint">यह विवरण वेबसाइट के दान पृष्ठ पर दिखेगा।</div>
+    </div>
+
+    <div class="field span-all">
+      <label class="check"><input type="checkbox" name="anonymous" value="1" <%= Number(d.anonymous) ? 'checked' : '' %>> गुप्त दान — वेबसाइट पर सदस्य का नाम न दिखाएँ</label>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary btn-lg" type="submit"><%- icon('save') %> <%= isNew ? 'प्रविष्टि सहेजें' : 'बदलाव सहेजें' %></button>
+    <% if (isNew) { %><button class="btn btn-outline" type="submit" name="again" value="1"><%- icon('plus') %> सहेजें और अगली प्रविष्टि</button><% } %>
+    <a class="btn btn-outline" href="/admin/donations<%= d.category ? '?category=' + d.category : '' %>">रद्द करें</a>
+  </div>
+</form>
+
+<%- include('../partials/admin-bottom', { scripts: ['/js/admin-records.js'] }) %>

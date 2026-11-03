@@ -1,0 +1,168 @@
+<%- include('../partials/admin-top') %>
+<%
+  const phoneOut = isSuper ? formatPhone : maskPhone;
+  const catBadge = { pramukh: 'maroon', padadhikari: 'gold', sadasya: 'green' };
+  const catIcon = { pramukh: 'award', padadhikari: 'shield', sadasya: 'users' };
+  const tabQs = (cat) => {
+    const p = new URLSearchParams(qs);
+    p.delete('page');
+    if (cat) p.set('category', cat); else p.delete('category');
+    const s = p.toString();
+    return '/admin/members' + (s ? '?' + s : '');
+  };
+  const pageUrl = (n) => '/admin/members?' + (qs ? qs + '&' : '') + 'page=' + n;
+  let lastCat = null;
+%>
+
+<div class="tabs" style="margin-bottom:16px">
+  <a href="<%= tabQs('') %>" class="<%= !filters.category ? 'active' : '' %>"><%- icon('list') %> सभी <span class="badge"><%= counts.all %></span></a>
+  <% CATEGORIES.forEach((c) => { %>
+    <a href="<%= tabQs(c.key) %>" class="<%= filters.category === c.key ? 'active' : '' %>"><%- icon(catIcon[c.key]) %> <%= c.label %> <span class="badge"><%= counts[c.key] %></span></a>
+  <% }) %>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <form class="toolbar" method="get" action="/admin/members">
+      <% if (filters.category) { %><input type="hidden" name="category" value="<%= filters.category %>"><% } %>
+      <input type="search" name="q" value="<%= filters.q %>" placeholder="नाम, क्रमांक, शहर, पद…">
+      <select name="mandal" data-autosubmit>
+        <option value="">सभी मंडल</option>
+        <% mandals.forEach((md) => { %><option value="<%= md.id %>" <%= filters.mandal === md.id ? 'selected' : '' %>><%= md.name %></option><% }) %>
+      </select>
+      <select name="committee" data-autosubmit>
+        <option value="">सभी समितियाँ</option>
+        <% committees.forEach((c) => { %><option value="<%= c.id %>" <%= filters.committee === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+      </select>
+      <select name="status" data-autosubmit>
+        <option value="approved" <%= filters.status === 'approved' ? 'selected' : '' %>>स्वीकृत</option>
+        <option value="pending" <%= filters.status === 'pending' ? 'selected' : '' %>>लंबित</option>
+        <option value="rejected" <%= filters.status === 'rejected' ? 'selected' : '' %>>अस्वीकृत</option>
+      </select>
+      <select name="cert" data-autosubmit aria-label="प्रमाण पत्र स्थिति">
+        <option value="">प्रमाण पत्र: सभी</option>
+        <option value="unprinted" <%= filters.cert === 'unprinted' ? 'selected' : '' %>>प्रमाण पत्र नहीं छपा</option>
+        <option value="printed" <%= filters.cert === 'printed' ? 'selected' : '' %>>प्रमाण पत्र छप चुका</option>
+      </select>
+      <button class="btn btn-outline" type="submit"><%- icon('search') %> खोजें</button>
+      <% if (qs && qs !== 'status=approved') { %><a class="btn btn-outline" href="/admin/members"><%- icon('x') %> साफ़ करें</a><% } %>
+    </form>
+    <div class="actions">
+      <a class="btn btn-outline btn-sm" href="/admin/members/export.csv<%= qs ? '?' + qs : '' %>"><%- icon('download') %> CSV</a>
+      <a class="btn btn-outline btn-sm" href="/admin/members/export.xlsx<%= qs ? '?' + qs : '' %>"><%- icon('download') %> Excel</a>
+      <% if (isSuper) { %><a class="btn btn-primary btn-sm" href="/admin/members/new"><%- icon('plus') %> नया सदस्य</a><% } %>
+    </div>
+  </div>
+  <% if (!isSuper) { %>
+    <div class="flash info" style="margin:14px 20px 0"><%- icon('lock') %> <span>गोपनीयता नीति: उप-एडमिन को मोबाइल नंबर आंशिक रूप से छिपे हुए दिखते हैं और निर्यात में भी छिपे रहते हैं।</span></div>
+  <% } %>
+
+  <form method="post" action="/admin/members/bulk" data-bulk data-total="<%= pg.total %>" data-qs="<%= qs %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="qs" value="<%= qs %>">
+    <input type="hidden" name="all_matching" value="0">
+    <div class="card-body bulk-bar">
+      <span class="muted small"><b data-selected-count>0</b> चयनित</span>
+      <select name="action" data-bulk-select>
+        <option value="">— सामूहिक कार्य चुनें —</option>
+        <option value="category">श्रेणी बदलें</option>
+        <option value="mandal">मंडल बदलें</option>
+        <option value="show">निर्देशिका में दिखाएँ</option>
+        <option value="hide">निर्देशिका से छिपाएँ</option>
+        <option value="cert_printed">प्रमाण पत्र "छपा" चिह्नित करें</option>
+        <option value="cert_unprinted">प्रमाण पत्र "नहीं छपा" चिह्नित करें</option>
+        <% if (isSuper) { %><option value="delete">स्थायी रूप से हटाएँ</option><% } %>
+      </select>
+      <select name="category" data-for-action="category" hidden>
+        <% CATEGORIES.forEach((c) => { %><option value="<%= c.key %>"><%= c.label %></option><% }) %>
+      </select>
+      <select name="mandal_id" data-for-action="mandal" hidden>
+        <% mandals.forEach((md) => { %><option value="<%= md.id %>"><%= md.name %></option><% }) %>
+      </select>
+      <button class="btn btn-outline btn-sm" type="submit" data-bulk-action data-confirm="चयनित सदस्यों पर यह कार्य लागू करें?">लागू करें</button>
+      <button class="btn btn-maroon btn-sm" type="button" data-bulk-action data-print-selected><%- icon('printer') %> चयनित के प्रमाण पत्र छापें</button>
+      <span class="muted small" style="margin-left:auto">कुल <b><%= pg.total %></b> परिणाम</span>
+    </div>
+    <% if (pg.total > rows.length) { %>
+      <div class="select-all-banner" data-all-banner hidden>
+        <span data-banner-page>इस पेज के सभी <%= rows.length %> सदस्य चुने गए।
+          <button type="button" class="link-btn" data-select-matching>इस फ़िल्टर के सभी <%= pg.total %> सदस्य चुनें</button></span>
+        <span data-banner-all hidden><b>इस फ़िल्टर के सभी <%= pg.total %> सदस्य चुने गए।</b>
+          <button type="button" class="link-btn" data-clear-matching>चयन हटाएँ</button></span>
+      </div>
+    <% } %>
+
+    <div class="table-wrap">
+      <table class="table members-table">
+        <thead>
+          <tr>
+            <th style="width:36px"><input type="checkbox" data-select-all aria-label="सभी चुनें"></th>
+            <th>सदस्य</th>
+            <th>श्रेणी / पद</th>
+            <th>मंडल / समिति</th>
+            <th>मोबाइल</th>
+            <th>शहर</th>
+            <th>प्रमाण पत्र</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+        <% if (!rows.length) { %>
+          <tr><td colspan="8"><div class="empty-state"><%- icon('users') %><p>इस फ़िल्टर में कोई सदस्य नहीं मिला।</p></div></td></tr>
+        <% } %>
+        <% rows.forEach((m) => { %>
+          <% if (!filters.category && m.category !== lastCat) { lastCat = m.category; %>
+            <tr class="group-row <%= m.category %>"><td colspan="8"><%- icon(catIcon[m.category]) %> <%= CATEGORY_LABEL[m.category] %></td></tr>
+          <% } %>
+          <tr>
+            <td><input type="checkbox" name="ids" value="<%= m.id %>" aria-label="<%= m.name %>"></td>
+            <td>
+              <div class="who-cell">
+                <% if (m.photo) { %><img class="thumb round" src="<%= m.photo %>" alt=""><% } else { %><span class="thumb round"><%= initials(m.name) %></span><% } %>
+                <div>
+                  <div class="cell-main"><a href="/admin/members/<%= m.id %>/edit"><%= m.salutation || '' %> <%= m.name %></a>
+                    <% if (!m.show_in_directory) { %><span title="निर्देशिका में छिपा"><%- icon('eye-off') %></span><% } %>
+                  </div>
+                  <div class="cell-sub mono"><%= m.member_no || m.application_no || '—' %></div>
+                </div>
+              </div>
+            </td>
+            <td><span class="badge <%= catBadge[m.category] %>"><%= CATEGORY_LABEL[m.category] %></span><div class="cell-sub"><%= m.designation || '' %></div></td>
+            <td><%= m.mandal_name || '—' %><div class="cell-sub"><%= m.committee_name || '' %></div></td>
+            <td class="nowrap mono"><%= phoneOut(m.phone) %></td>
+            <td><%= m.city || '—' %></td>
+            <td class="nowrap">
+              <% if (m.cert_print_count) { %>
+                <span class="badge green" title="<%= m.cert_print_count %> बार छपा"><%- icon('check') %> छपा<%= m.cert_print_count > 1 ? ` ×${m.cert_print_count}` : '' %></span>
+                <div class="cell-sub"><%= formatDate(m.cert_printed_at, 'short') %></div>
+              <% } else if (m.status === 'approved') { %>
+                <span class="badge gray">नहीं छपा</span>
+              <% } else { %>
+                <span class="muted">—</span>
+              <% } %>
+            </td>
+            <td>
+              <div class="actions">
+                <a class="btn btn-outline btn-sm btn-icon" href="/admin/members/<%= m.id %>/edit" title="संपादित करें"><%- icon('edit') %></a>
+                <% if (m.status === 'approved') { %><a class="btn btn-outline btn-sm btn-icon" href="/admin/certificates?ids=<%= m.id %>" title="प्रमाण पत्र प्रिंट"><%- icon('printer') %></a><% } %>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </form>
+
+  <% if (pg.pages > 1) { %>
+    <nav class="pager">
+      <% if (pg.page > 1) { %><a href="<%= pageUrl(pg.page - 1) %>"><%- icon('chevron-left') %></a><% } %>
+      <% for (let i = Math.max(1, pg.page - 3); i <= Math.min(pg.pages, pg.page + 3); i++) { %>
+        <% if (i === pg.page) { %><span class="current"><%= i %></span><% } else { %><a href="<%= pageUrl(i) %>"><%= i %></a><% } %>
+      <% } %>
+      <% if (pg.page < pg.pages) { %><a href="<%= pageUrl(pg.page + 1) %>"><%- icon('chevron-right') %></a><% } %>
+    </nav>
+  <% } %>
+</div>
+
+<%- include('../partials/admin-bottom') %>

@@ -1,0 +1,283 @@
+<%- include('../partials/header') %>
+
+<section class="hero" style="background-image:url('<%= site.hero_image %>')">
+  <div class="container">
+    <div class="hero-inner">
+      <span class="hero-badge"><%- icon('sun') %> <%= site.hero_badge %></span>
+      <h1><%= site.hero_title %></h1>
+      <div class="hero-tagline"><%= site.tagline %></div>
+      <p class="hero-sub"><%= site.hero_subtitle %></p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="/join"><%- icon('user-check') %> हमसे जुड़ें</a>
+        <a class="btn btn-light" href="/directory"><%- icon('users') %> सदस्य निर्देशिका देखें</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="stats">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat"><strong><%= stats.members %>+</strong><span>पंजीकृत सदस्य</span></div>
+      <div class="stat"><strong><%= stats.mandals %></strong><span>प्रशासनिक मंडल</span></div>
+      <div class="stat"><strong><%= stats.committees %></strong><span>समितियाँ एवं प्रकोष्ठ</span></div>
+      <div class="stat"><strong><%= site.established || stats.events %></strong><span><%= site.established ? 'स्थापना वर्ष' : 'आयोजन' %></span></div>
+    </div>
+  </div>
+</div>
+
+<% const founders = people.filter((p) => p.grp === 'founder');
+   const leaders = people.filter((p) => p.grp === 'leader');
+   const trustees = people.filter((p) => p.grp === 'trustee');
+   let alt = false; %>
+
+<% for (const s of sections) { %>
+  <% const head = () => { %>
+    <div class="section-head reveal">
+      <% if (s.nav_label && s.nav_label !== s.title) { %><span class="eyebrow"><%= s.nav_label %></span><% } %>
+      <h2><%= s.title %></h2>
+      <div class="ornament"><i></i></div>
+      <% if (s.subtitle) { %><p><%= s.subtitle %></p><% } %>
+    </div>
+  <% } %>
+
+  <% if (s.slug === 'about' || (s.kind === 'custom')) { alt = !alt; %>
+    <section class="section <%= alt ? '' : 'section-alt' %>" id="<%= s.slug %>">
+      <div class="container">
+        <div class="split <%= s.image ? s.layout : 'full' %>">
+          <div class="prose reveal">
+            <span class="eyebrow-inline"><%= s.subtitle || s.nav_label || '' %></span>
+            <h2><%= s.title %></h2>
+            <%- s.body || '' %>
+            <% if (s.kind === 'custom' && s.has_page) { %>
+              <a class="btn btn-outline" href="/page/<%= s.slug %>">और पढ़ें <%- icon('arrow-right') %></a>
+            <% } else if (s.slug === 'about') { %>
+              <a class="btn btn-primary" href="/join"><%- icon('user-check') %> संघ से जुड़ें</a>
+            <% } %>
+          </div>
+          <% if (s.image) { %>
+            <div class="split-media reveal"><img src="<%= s.image %>" alt="<%= s.title %>" loading="lazy"></div>
+          <% } %>
+        </div>
+      </div>
+    </section>
+
+  <% } else if (s.slug === 'president') { alt = !alt; %>
+    <section class="section <%= alt ? '' : 'section-alt' %>" id="president">
+      <div class="container">
+        <div class="president reveal">
+          <div class="president-photo"><img src="<%= s.image || '/img/avatar.svg' %>" alt="<%= s.subtitle || s.title %>" loading="lazy"></div>
+          <div class="president-body prose">
+            <span class="eyebrow-inline"><%= s.nav_label || 'संदेश' %></span>
+            <h2><%= s.title %></h2>
+            <%- s.body || '' %>
+            <% if (s.subtitle) { %><div class="president-sign">— <%= s.subtitle %></div><% } %>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  <% } else if (s.slug === 'vision-mission') { alt = !alt; %>
+    <section class="section <%= alt ? '' : 'section-alt' %>" id="vision-mission">
+      <div class="container">
+        <% head() %>
+        <div class="vm-grid">
+          <div class="vm-card prose reveal">
+            <h3><span class="vm-icon"><%- icon('eye') %></span> दृष्टि</h3>
+            <%- s.body || '' %>
+          </div>
+          <div class="vm-card mission prose reveal">
+            <h3><span class="vm-icon"><%- icon('flag') %></span> ध्येय</h3>
+            <%- s.body2 || '' %>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  <% } else if (s.slug === 'leadership' && (founders.length || leaders.length)) { alt = !alt; %>
+    <section class="section <%= alt ? '' : 'section-alt' %>" id="leadership">
+      <div class="container">
+        <% head() %>
+        <% for (const [title, list] of [['संस्थापक', founders], ['वर्तमान नेतृत्व', leaders]]) { if (!list.length) continue; %>
+          <div class="group-title"><%= title %></div>
+          <div class="people-grid">
+            <% for (const p of list) { %>
+              <article class="person-card reveal">
+                <div class="person-photo"><img src="<%= p.photo || '/img/avatar.svg' %>" alt="<%= p.name %>" loading="lazy"></div>
+                <div class="person-info">
+                  <h3><%= p.name %></h3>
+                  <% if (p.designation) { %><span class="person-role"><%= p.designation %></span><% } %>
+                  <% if (p.place) { %><div class="person-place"><%- icon('map-pin') %> <%= p.place %></div><% } %>
+                  <% if (p.bio) { %><p class="person-bio"><%= p.bio %></p><% } %>
+                </div>
+              </article>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+    </section>
+
+  <% } else if (s.slug === 'trustees' && trustees.length) { %>
+    <section class="section section-dark" id="trustees">
+      <div class="container">
+        <% head() %>
+        <div class="trustee-grid">
+          <% for (const p of trustees) { %>
+            <div class="trustee reveal">
+              <img src="<%= p.photo || '/img/avatar.svg' %>" alt="<%= p.name %>" loading="lazy">
+              <div><strong><%= p.name %></strong><span><%= p.designation %><%= p.place ? ' • ' + p.place : '' %></span></div>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </section>
+
+  <% } else if (s.slug === 'programs' && programs.length) { alt = !alt; %>
+    <section class="section <%= alt ? '' : 'section-alt' %>" id="programs">
+      <div class="container">
+        <% head() %>
+        <div class="card-grid">
+          <% for (const p of programs) { %>
+            <article class="program-card reveal">
+              <div class="program-media">
+                <% if (p.image) { %><img src="<%= p.image %>" alt="<%= p.title %>" loading="lazy"><% } else { %><%- icon(p.icon || 'star') %><% } %>
+                <span class="program-icon"><%- icon(p.icon || 'star') %></span>
+              </div>
+              <div class="program-body">
+                <h3><%= p.title %></h3>
+                <p><%= p.summary %></p>
+              </div>
+            </article>
+          <% } %>
+        </div>
+      </div>
+    </section>
+
+  <% } else if (s.slug === 'events' && (upcoming.length || past.length)) { alt = !alt; %>
+    <section class="section <%= alt ? '' : 'section-alt' %>" id="events">
+      <div class="container">
+        <% head() %>
+        <div class="events-cols">
+          <% for (const [title, list, ic] of [['आगामी कार्यक्रम', upcoming, 'calendar'], ['पिछली झलकियाँ', past, 'image']]) { %>
+            <div class="events-col">
+              <h3><%- icon(ic) %> <%= title %></h3>
+              <% if (!list.length) { %><p class="hint">शीघ्र ही नए कार्यक्रमों की घोषणा की जाएगी।</p><% } %>
+              <% for (const e of list) { const d = dateParts(e.event_date); %>
+                <a class="event-item reveal" href="/events/<%= e.id %>">
+                  <% if (e.image) { %><img class="event-thumb" src="<%= e.image %>" alt="" loading="lazy"><% } else { %><div class="date-badge"><b><%= d.day %></b><span><%= d.month %></span></div><% } %>
+                  <div>
+                    <h4><%= e.title %></h4>
+                    <div class="event-meta">
+                      <span><%- icon('calendar') %> <%= formatDate(e.event_date) %></span>
+                      <% if (e.location) { %><span><%- icon('map-pin') %> <%= e.location %></span><% } %>
+                    </div>
+                  </div>
+                </a>
+              <% } %>
+            </div>
+          <% } %>
+        </div>
+        <div style="text-align:center;margin-top:16px"><a class="btn btn-outline" href="/events">सभी गतिविधियाँ देखें <%- icon('arrow-right') %></a></div>
+      </div>
+    </section>
+
+  <% } else if (s.slug === 'directory') { alt = !alt; %>
+    <section class="section <%= alt ? '' : 'section-alt' %>" id="directory">
+      <div class="container">
+        <% head() %>
+        <div class="cat-cards">
+          <% const catIcons = { pramukh: 'award', padadhikari: 'shield', sadasya: 'users' }; %>
+          <% for (const c of CATEGORIES) { %>
+            <a class="cat-card reveal" href="/directory?category=<%= c.key %>">
+              <%- icon(catIcons[c.key]) %>
+              <strong><%= counts[c.key] %></strong>
+              <h3><%= c.label %></h3>
+              <p><%= c.desc %></p>
+              <span class="more">सूची देखें <%- icon('arrow-right') %></span>
+            </a>
+          <% } %>
+        </div>
+        <% if (mandals.length) { %>
+          <div class="mandal-chips" style="justify-content:center;margin-top:30px">
+            <% for (const m of mandals) { %><a class="chip" href="/directory?mandal=<%= m.id %>"><%= m.name %></a><% } %>
+          </div>
+        <% } %>
+      </div>
+    </section>
+
+  <% } else if (s.slug === 'wall' && posts.length) { alt = !alt; %>
+    <section class="section <%= alt ? '' : 'section-alt' %>" id="wall">
+      <div class="container">
+        <% head() %>
+        <div class="card-grid">
+          <% for (const p of posts) { %>
+            <a class="event-card reveal" href="/wall">
+              <% if (p.image) { %><img src="<%= p.image %>" alt="" loading="lazy"><% } %>
+              <div class="event-card-body">
+                <span class="tag <%= p.category === 'announcement' ? 'maroon' : p.category === 'achievement' ? 'gold' : p.category === 'event' ? 'green' : '' %>"><%= POST_CATEGORY_LABEL[p.category] %></span>
+                <h3 style="margin-top:8px"><%= p.title || (p.body.slice(0, 60) + '…') %></h3>
+                <p class="hint" style="margin:0"><%= p.body.length > 140 ? p.body.slice(0, 140) + '…' : p.body %></p>
+                <div class="event-meta" style="margin-top:10px">
+                  <span><%- icon('clock') %> <%= relativeTime(p.created_at) %></span>
+                  <span><%- icon('thumbs-up') %> <%= p.likes %></span>
+                  <span><%- icon('message-circle') %> <%= p.comment_count %></span>
+                </div>
+              </div>
+            </a>
+          <% } %>
+        </div>
+        <div style="text-align:center;margin-top:28px"><a class="btn btn-outline" href="/wall">सामुदायिक मंच पर जाएँ <%- icon('arrow-right') %></a></div>
+      </div>
+    </section>
+
+  <% } else if (s.slug === 'join') { %>
+    <section class="section" id="join">
+      <div class="container">
+        <div class="cta reveal">
+          <div>
+            <h2><%= s.title %></h2>
+            <p><%= s.subtitle %></p>
+            <div class="cta-steps">
+              <span><%- icon('file-text') %> फ़ॉर्म भरें</span>
+              <span><%- icon('pen-tool') %> डिजिटल हस्ताक्षर</span>
+              <span><%- icon('check') %> एडमिन स्वीकृति</span>
+              <span><%- icon('award') %> सदस्य प्रमाण पत्र</span>
+            </div>
+          </div>
+          <div class="cta-actions">
+            <a class="btn btn-primary" href="/join"><%- icon('user-check') %> ऑनलाइन आवेदन करें</a>
+            <a class="btn btn-light" href="/status"><%- icon('search') %> आवेदन की स्थिति</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  <% } else if (s.slug === 'contact') { alt = !alt; %>
+    <section class="section <%= alt ? '' : 'section-alt' %>" id="contact">
+      <div class="container">
+        <% head() %>
+        <div class="contact-grid">
+          <div class="contact-list">
+            <div class="contact-item"><span class="ci"><%- icon('map-pin') %></span><div><small>पता</small><b><%= site.address %></b></div></div>
+            <% if (site.phone) { %><div class="contact-item"><span class="ci"><%- icon('phone') %></span><div><small>फ़ोन</small><b><a href="<%= telHref(site.phone) %>"><%= site.phone %></a></b></div></div><% } %>
+            <% if (site.email) { %><div class="contact-item"><span class="ci"><%- icon('mail') %></span><div><small>ईमेल</small><b><a href="mailto:<%= site.email %>"><%= site.email %></a></b></div></div><% } %>
+            <% if (site.whatsapp) { %><div class="contact-item"><span class="ci"><%- icon('whatsapp') %></span><div><small>व्हाट्सऐप</small><b><a href="https://wa.me/<%= site.whatsapp.replace(/\D/g, '') %>" target="_blank" rel="noopener"><%= site.whatsapp %></a></b></div></div><% } %>
+          </div>
+          <% if (site.map_embed) { %>
+            <iframe class="map-frame" src="<%= site.map_embed %>" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="नक्शा"></iframe>
+          <% } else { %>
+            <div class="map-placeholder">
+              <div>
+                <h3><%= site.org_name %></h3>
+                <p><%= site.address %></p>
+                <a class="btn btn-light" href="/join"><%- icon('user-check') %> सदस्य बनें</a>
+              </div>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </section>
+  <% } %>
+<% } %>
+
+<%- include('../partials/footer') %>

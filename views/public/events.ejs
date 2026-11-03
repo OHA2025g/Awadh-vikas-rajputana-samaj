@@ -1,0 +1,40 @@
+<%- include('../partials/header') %>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="crumbs"><a href="/">मुखपृष्ठ</a> / गतिविधियाँ</div>
+    <h1>गतिविधियाँ एवं आयोजन</h1>
+    <p>संघ के आगामी कार्यक्रम, बैठकें एवं पिछले आयोजनों की झलकियाँ।</p>
+  </div>
+</section>
+
+<% for (const [title, list, ic] of [['आगामी कार्यक्रम', upcoming, 'calendar'], ['पिछली झलकियाँ', past, 'image']]) { %>
+  <section class="section <%= ic === 'image' ? 'section-alt' : '' %>" style="padding-top:44px;padding-bottom:44px">
+    <div class="container">
+      <h2 style="display:flex;gap:10px;align-items:center"><%- icon(ic) %> <%= title %></h2>
+      <% if (!list.length) { %>
+        <div class="empty"><%- icon(ic) %><p>अभी कोई आयोजन सूचीबद्ध नहीं है।</p></div>
+      <% } else { %>
+        <div class="card-grid">
+          <% for (const e of list) { %>
+            <a class="event-card" href="/events/<%= e.id %>">
+              <img src="<%= e.image || site.hero_image %>" alt="<%= e.title %>" loading="lazy">
+              <div class="event-card-body">
+                <span class="tag <%= ic === 'calendar' ? 'green' : '' %>"><%= ic === 'calendar' ? 'आगामी' : 'संपन्न' %></span>
+                <h3 style="margin-top:8px"><%= e.title %></h3>
+                <div class="event-meta">
+                  <span><%- icon('calendar') %> <%= formatDate(e.event_date) %></span>
+                  <% if (e.event_time) { %><span><%- icon('clock') %> <%= e.event_time %></span><% } %>
+                  <% if (e.location) { %><span><%- icon('map-pin') %> <%= e.location %></span><% } %>
+                </div>
+                <% if (e.summary) { %><p class="hint" style="margin:10px 0 0"><%= e.summary %></p><% } %>
+              </div>
+            </a>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+  </section>
+<% } %>
+
+<%- include('../partials/footer') %>

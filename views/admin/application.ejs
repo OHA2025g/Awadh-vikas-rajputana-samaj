@@ -1,0 +1,93 @@
+<%- include('../partials/admin-top') %>
+
+<p><a href="/admin/applications"><%- icon('chevron-left') %> सभी आवेदन</a></p>
+
+<% if (m.status !== 'pending') { %>
+  <div class="flash <%= m.status === 'approved' ? 'success' : 'error' %>">
+    <%- icon('info') %>
+    <span>यह आवेदन <b><%= STATUS_LABEL[m.status] %></b> है<% if (m.member_no) { %> — सदस्य क्रमांक <b><%= m.member_no %></b><% } %><% if (m.reject_reason) { %> — कारण: <%= m.reject_reason %><% } %>।</span>
+  </div>
+<% } %>
+
+<div class="grid cols-3">
+  <div class="span-2">
+    <section class="card">
+      <div class="card-head">
+        <h2><%- icon('file-text') %> सदस्यता फॉर्म — <%= m.name %></h2>
+        <div class="actions">
+          <a class="btn btn-outline btn-sm" href="/admin/members/<%= m.id %>/form" target="_blank" rel="noopener"><%- icon('printer') %> फॉर्म प्रिंट</a>
+          <a class="btn btn-outline btn-sm" href="/admin/members/<%= m.id %>/edit"><%- icon('edit') %> संपादित करें</a>
+        </div>
+      </div>
+      <div class="card-body">
+        <%- include('../partials/membership-form', { mf: { mode: 'view', m, secure: isSuper, dateText: formDate } }) %>
+        <p class="hint" style="text-align:center">ऑनलाइन जमा: <%= formatDate(m.created_at, 'datetime') %> · आवेदक ने घोषणा स्वीकार कर डिजिटल हस्ताक्षर किए हैं (हस्ताक्षर फ़ाइल सार्वजनिक नहीं है)।</p>
+      </div>
+    </section>
+  </div>
+
+  <div>
+    <% if (m.status !== 'approved') { %>
+    <form class="card" method="post" action="/admin/applications/<%= m.id %>/approve">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="card-head"><h2><%- icon('check') %> स्वीकृति</h2></div>
+      <div class="card-body stack">
+        <div class="field">
+          <label for="category">श्रेणी</label>
+          <select id="category" name="category">
+            <% CATEGORIES.forEach((c) => { %><option value="<%= c.key %>" <%= (m.category || 'sadasya') === c.key ? 'selected' : '' %>><%= c.label %></option><% }) %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="designation">पद (वैकल्पिक)</label>
+          <input type="text" id="designation" name="designation" value="<%= m.designation || '' %>" placeholder="जैसे: उपाध्यक्ष, मंडल सचिव">
+        </div>
+        <div class="field">
+          <label for="mandal_id">मंडल</label>
+          <select id="mandal_id" name="mandal_id">
+            <option value="">— चुनें —</option>
+            <% mandals.forEach((md) => { %><option value="<%= md.id %>" <%= m.mandal_id === md.id ? 'selected' : '' %>><%= md.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="committee_id">समिति</label>
+          <select id="committee_id" name="committee_id">
+            <option value="">— कोई नहीं —</option>
+            <% committees.forEach((c) => { %><option value="<%= c.id %>" <%= m.committee_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+          </select>
+        </div>
+        <label class="check"><input type="checkbox" name="show_in_directory" value="1" checked> सार्वजनिक निर्देशिका में दिखाएँ</label>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-green btn-block" type="submit"><%- icon('user-check') %> स्वीकृत करें व सदस्य क्रमांक दें</button>
+      </div>
+    </form>
+    <% } %>
+
+    <% if (m.status === 'pending') { %>
+    <form class="card" method="post" action="/admin/applications/<%= m.id %>/reject" data-confirm="क्या आप यह आवेदन अस्वीकृत करना चाहते हैं?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="card-head"><h2><%- icon('x') %> अस्वीकृति</h2></div>
+      <div class="card-body">
+        <div class="field">
+          <label for="reason">कारण (आवेदक को स्थिति जाँच में दिखेगा)</label>
+          <textarea id="reason" name="reason" rows="3" maxlength="300" placeholder="जैसे: दी गई जानकारी अपूर्ण है"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-danger btn-block" type="submit"><%- icon('x') %> आवेदन अस्वीकृत करें</button>
+      </div>
+    </form>
+    <% } %>
+
+    <% if (isSuper) { %>
+    <form method="post" action="/admin/members/<%= m.id %>/delete" data-confirm="यह आवेदन स्थायी रूप से हटाया जाएगा। जारी रखें?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="back" value="applications">
+      <button class="btn btn-outline btn-sm btn-block" type="submit"><%- icon('trash') %> आवेदन स्थायी रूप से हटाएँ</button>
+    </form>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../partials/admin-bottom') %>

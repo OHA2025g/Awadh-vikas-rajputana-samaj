@@ -1,0 +1,74 @@
+<%- include('../partials/admin-top') %>
+
+<div class="grid cols-3">
+  <div class="span-2">
+    <section class="card">
+      <div class="card-head">
+        <h2><%- icon('pen-tool') %> सहेजे गए हस्ताक्षर</h2>
+        <div class="actions"><a class="btn btn-maroon btn-sm" href="/admin/certificates"><%- icon('printer') %> प्रमाण पत्र प्रिंटर</a></div>
+      </div>
+      <div class="card-body">
+        <% if (!signatures.length) { %>
+          <div class="empty-state"><%- icon('pen-tool') %><p>अभी कोई हस्ताक्षर नहीं जोड़ा गया। दाईं ओर से अध्यक्ष / सचिव के हस्ताक्षर जोड़ें।</p></div>
+        <% } %>
+        <div class="grid cols-2">
+          <% signatures.forEach((s) => { %>
+            <div class="sig-tile <%= s.is_default ? 'default' : '' %>">
+              <div class="sig-box"><img src="/admin/certificates/signature/<%= s.id %>" alt="<%= s.label %>"></div>
+              <div>
+                <b><%= s.label %></b><% if (s.signer_name) { %> — <%= s.signer_name %><% } %>
+                <% if (s.is_default) { %><span class="badge solid">डिफ़ॉल्ट</span><% } %>
+                <div class="cell-sub"><%= formatDate(s.created_at, 'short') %></div>
+              </div>
+              <div class="toolbar">
+                <% if (!s.is_default) { %>
+                  <form method="post" action="/admin/signatures/<%= s.id %>/default" class="inline-form">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="btn btn-outline btn-sm" type="submit"><%- icon('star') %> डिफ़ॉल्ट बनाएँ</button>
+                  </form>
+                <% } %>
+                <form method="post" action="/admin/signatures/<%= s.id %>/delete" class="inline-form" data-confirm="यह हस्ताक्षर हटाएँ?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-danger btn-sm" type="submit"><%- icon('trash') %> हटाएँ</button>
+                </form>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <form class="card" method="post" action="/admin/signatures" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="drawn" value="">
+    <div class="card-head"><h2><%- icon('plus') %> नया हस्ताक्षर</h2></div>
+    <div class="card-body stack">
+      <div class="field">
+        <label for="label">पद <span class="req">*</span></label>
+        <input type="text" id="label" name="label" required maxlength="60" list="sig-labels" placeholder="अध्यक्ष / सचिव">
+        <datalist id="sig-labels"><option value="अध्यक्ष"><option value="सचिव"><option value="अध्यक्ष / सचिव"></datalist>
+      </div>
+      <div class="field">
+        <label for="signer_name">हस्ताक्षरकर्ता का नाम</label>
+        <input type="text" id="signer_name" name="signer_name" maxlength="80">
+      </div>
+      <div class="field">
+        <span class="label">यहाँ हस्ताक्षर करें (माउस / टच)</span>
+        <div class="sig-wrap"><canvas id="sig-canvas"></canvas></div>
+        <div class="toolbar" style="margin-top:6px">
+          <button class="btn btn-outline btn-sm" type="button" id="sig-clear"><%- icon('rotate-ccw') %> साफ़ करें</button>
+          <label class="small">स्याही <input type="color" id="sig-color" value="#0b1d5b" style="width:44px;height:30px;padding:2px;vertical-align:middle"></label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="sig-file">या स्कैन की हुई हस्ताक्षर फ़ाइल अपलोड करें</label>
+        <input type="file" id="sig-file" name="file" accept="image/png,image/jpeg,image/webp">
+        <div class="hint">सफ़ेद कागज़ पर काली/नीली स्याही से किए हस्ताक्षर का क्रॉप किया हुआ फोटो, या पारदर्शी PNG सबसे अच्छा। प्रिंट में सफ़ेद पृष्ठभूमि स्वतः पारदर्शी जैसी छपती है।</div>
+      </div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary btn-block" type="submit"><%- icon('save') %> हस्ताक्षर सहेजें</button></div>
+  </form>
+</div>
+
+<%- include('../partials/admin-bottom', { scripts: ['/js/signature-pad.js'] }) %>

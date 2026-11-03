@@ -1,0 +1,116 @@
+<%- include('../partials/header') %>
+<%
+  const current = DONATION_CATEGORIES.find((c) => c.key === filters.category);
+  const tabUrl = (key) => '/donations?category=' + key + (filters.q ? '&q=' + encodeURIComponent(filters.q) : '') + '#ledger';
+  const pageUrl = (n) => '/donations?category=' + filters.category + (filters.q ? '&q=' + encodeURIComponent(filters.q) : '') + '&page=' + n + '#ledger';
+%>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="crumbs"><a href="/">मुखपृष्ठ</a> / दान एवं सहयोग</div>
+    <h1>दान एवं सहयोग</h1>
+    <p>संघ को प्राप्त आजीवन सदस्यता शुल्क, दान एवं आयोजन सहयोग का पारदर्शी विवरण। सभी सहयोगकर्ताओं का हार्दिक आभार।</p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:40px">
+  <div class="container">
+    <div class="don-summary" id="ledger" role="tablist" aria-label="दान की श्रेणी">
+      <% DONATION_CATEGORIES.forEach((c) => { const selected = c.key === filters.category; %>
+        <a class="don-stat<%= selected ? ' active' : '' %>" href="<%= tabUrl(c.key) %>" role="tab" aria-selected="<%= selected %>">
+          <span class="don-stat-ic"><%- icon(c.icon) %></span>
+          <span class="don-stat-body">
+            <span class="don-stat-label"><%= c.label %></span>
+            <strong><%= formatINR(totals[c.key].sum) %></strong>
+            <span class="don-stat-count"><%= entryCount(totals[c.key].n) %></span>
+          </span>
+        </a>
+      <% }) %>
+    </div>
+
+    <div class="ledger" role="tabpanel">
+      <div class="ledger-head">
+        <div>
+          <h2><%= current.label %></h2>
+          <p>कुल राशि <strong><%= formatINR(totals[filters.category].sum) %></strong> • <%= entryCount(totals[filters.category].n) %></p>
+        </div>
+        <form class="ledger-search" method="get" action="/donations#ledger" role="search">
+          <input type="hidden" name="category" value="<%= filters.category %>">
+          <label class="input-icon">
+            <span class="sr-only">नाम से खोजें</span>
+            <%- icon('search') %>
+            <input type="search" name="q" value="<%= filters.q %>" placeholder="सदस्य के नाम से खोजें…" autocomplete="off">
+          </label>
+          <button class="btn btn-primary" type="submit">खोजें</button>
+          <% if (filters.q) { %><a class="btn btn-outline" href="<%= tabUrl(filters.category).replace(/&q=[^&#]*/, '') %>">साफ़ करें</a><% } %>
+        </form>
+      </div>
+
+      <% if (!rows.length) { %>
+        <div class="empty">
+          <%- icon(current.icon) %>
+          <p><%= filters.q ? 'इस नाम से कोई प्रविष्टि नहीं मिली।' : 'इस श्रेणी में अभी कोई प्रविष्टि नहीं है।' %></p>
+        </div>
+      <% } else { %>
+        <div class="ledger-wrap">
+          <table class="ledger-table">
+            <thead>
+              <tr>
+                <th>क्रम संख्या</th>
+                <th>सदस्य का नाम</th>
+                <th class="num">राशि (₹)</th>
+                <th>भुगतान प्रकार</th>
+                <th>दिनांक</th>
+                <th>लेन-देन विवरण / संदर्भ संख्या</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach((d, i) => { %>
+                <tr>
+                  <td data-label="क्रम संख्या"><%= pg.offset + i + 1 %></td>
+                  <td data-label="सदस्य का नाम" class="<%= d.anonymous ? 'don-anon' : 'don-name' %>"><%= d.name %></td>
+                  <td data-label="राशि (₹)" class="num don-amount"><%= d.amount %></td>
+                  <td data-label="भुगतान प्रकार"><span class="pay-chip"><%= d.mode %></span></td>
+                  <td data-label="दिनांक" class="nowrap"><%= d.date %></td>
+                  <td data-label="विवरण / संदर्भ">
+                    <div>
+                      <% if (d.details) { %><span><%= d.details %></span><% } %>
+                      <% if (d.reference) { %><span class="don-ref">संदर्भ: <%= d.reference %></span><% } %>
+                      <% if (!d.details && !d.reference) { %><span class="muted">—</span><% } %>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <% if (pg.pages > 1) { %>
+        <nav class="pager" aria-label="पृष्ठ">
+          <% if (pg.page > 1) { %><a href="<%= pageUrl(pg.page - 1) %>" aria-label="पिछला"><%- icon('chevron-left') %></a><% } %>
+          <% for (let n = Math.max(1, pg.page - 3); n <= Math.min(pg.pages, pg.page + 3); n++) { %>
+            <% if (n === pg.page) { %><span class="current"><%= n %></span><% } else { %><a href="<%= pageUrl(n) %>"><%= n %></a><% } %>
+          <% } %>
+          <% if (pg.page < pg.pages) { %><a href="<%= pageUrl(pg.page + 1) %>" aria-label="अगला"><%- icon('chevron-right') %></a><% } %>
+        </nav>
+      <% } %>
+    </div>
+
+    <p class="privacy-note"><%- icon('lock') %> दानदाताओं की गोपनीयता हेतु संदर्भ संख्या के केवल अंतिम 4 अंक दिखाए गए हैं। "गुप्त दान" प्रविष्टियों में नाम प्रकाशित नहीं किया जाता।</p>
+
+    <div class="don-cta">
+      <span class="don-cta-ic"><%- icon('heart') %></span>
+      <div>
+        <h3>संघ के सेवा कार्यों में सहयोग करें</h3>
+        <p>आजीवन सदस्यता, दान अथवा आयोजन सहयोग हेतु संघ कार्यालय से संपर्क करें। पारदर्शिता हेतु प्रत्येक सहयोग का विवरण इस पृष्ठ पर प्रकाशित किया जाता है।</p>
+      </div>
+      <div class="don-cta-actions">
+        <% if (site.phone) { %><a class="btn btn-primary" href="<%= telHref(site.phone) %>"><%- icon('phone') %> <%= site.phone.split(/[,/]/)[0].trim() %></a><% } %>
+        <a class="btn btn-outline" href="/#contact"><%- icon('mail') %> संपर्क करें</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%- include('../partials/footer') %>

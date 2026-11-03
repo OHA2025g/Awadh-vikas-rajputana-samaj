@@ -1,0 +1,80 @@
+<%- include('../partials/admin-top') %>
+<%
+  const isNew = !row.id;
+  const gallery = (v) => { try { return JSON.parse(v || '[]'); } catch { return []; } };
+  const wide = (f) => ['textarea', 'richtext', 'gallery'].includes(f.type);
+%>
+
+<p><a href="/admin/r/<%= resKey %>"><%- icon('chevron-left') %> <%= r.title %></a></p>
+
+<% if (errors.length) { %>
+  <div class="flash error"><%- icon('alert') %> <span><%= errors.join(' ') %></span></div>
+<% } %>
+
+<form class="card" method="post" action="<%= isNew ? '/admin/r/' + resKey : '/admin/r/' + resKey + '/' + row.id %>" enctype="multipart/form-data">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <div class="card-head"><h2><%- icon(isNew ? 'plus' : 'edit') %> <%= pageTitle %></h2></div>
+  <div class="card-body grid cols-2">
+    <% r.fields.forEach((f) => { const v = row[f.name] ?? ''; const id = 'f-' + f.name; %>
+      <div class="field <%= wide(f) ? 'span-all' : '' %>">
+        <% switch (f.type) {
+             case 'text': %>
+            <label for="<%= id %>"><%= f.label %><% if (f.required) { %> <span class="req">*</span><% } %></label>
+            <input type="text" id="<%= id %>" name="<%= f.name %>" value="<%= v %>" maxlength="<%= f.max || 200 %>" placeholder="<%= f.placeholder || '' %>" <%= f.required ? 'required' : '' %>>
+        <%   break;
+             case 'textarea': %>
+            <label for="<%= id %>"><%= f.label %></label>
+            <textarea id="<%= id %>" name="<%= f.name %>" rows="4" maxlength="<%= f.max || 2000 %>"><%= v %></textarea>
+        <%   break;
+             case 'richtext': %>
+            <label for="<%= id %>"><%= f.label %></label>
+            <textarea id="<%= id %>" name="<%= f.name %>" data-rte><%= v %></textarea>
+        <%   break;
+             case 'date': %>
+            <label for="<%= id %>"><%= f.label %></label>
+            <input type="date" id="<%= id %>" name="<%= f.name %>" value="<%= v %>">
+        <%   break;
+             case 'select': %>
+            <label for="<%= id %>"><%= f.label %></label>
+            <select id="<%= id %>" name="<%= f.name %>">
+              <% f.options.forEach(([k, label]) => { %><option value="<%= k %>" <%= String(v) === String(k) ? 'selected' : '' %>><%= label %></option><% }) %>
+            </select>
+        <%   break;
+             case 'checkbox': %>
+            <label class="check" style="margin-top:28px"><input type="checkbox" name="<%= f.name %>" value="1" <%= Number(v) ? 'checked' : '' %>> <%= f.label %></label>
+        <%   break;
+             case 'image': %>
+            <span class="label"><%= f.label %></span>
+            <div class="img-field">
+              <img id="<%= id %>-prev" src="<%= v %>" alt="" <%= v ? '' : 'hidden' %>>
+              <div class="stack" style="gap:6px">
+                <input type="file" name="<%= f.name %>" accept="image/jpeg,image/png,image/webp" data-preview="#<%= id %>-prev">
+                <% if (v) { %><label class="check small"><input type="checkbox" name="remove_<%= f.name %>" value="1"> चित्र हटाएँ</label><% } %>
+              </div>
+            </div>
+        <%   break;
+             case 'gallery': %>
+            <span class="label"><%= f.label %></span>
+            <% const imgs = gallery(v); if (imgs.length) { %>
+              <div class="gallery-edit">
+                <% imgs.forEach((p) => { %>
+                  <label><img src="<%= p %>" alt=""><span class="check"><input type="checkbox" name="remove_<%= f.name %>" value="<%= p %>"> हटाएँ</span></label>
+                <% }) %>
+              </div>
+            <% } %>
+            <input type="file" name="<%= f.name %>" accept="image/jpeg,image/png,image/webp" multiple>
+        <%   break;
+             default: %>
+            <span class="label"><%= f.label %></span>
+        <% } %>
+        <% if (f.hint) { %><div class="hint"><%= f.hint %></div><% } %>
+      </div>
+    <% }) %>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary btn-lg" type="submit"><%- icon('save') %> <%= isNew ? 'जोड़ें' : 'सहेजें' %></button>
+    <a class="btn btn-outline" href="/admin/r/<%= resKey %>">रद्द करें</a>
+  </div>
+</form>
+
+<%- include('../partials/admin-bottom') %>

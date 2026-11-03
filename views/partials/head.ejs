@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= pageTitle ? pageTitle + ' | ' : '' %><%= site.org_name %>, <%= site.city %></title>
+  <meta name="description" content="<%= site.footer_about %>">
+  <meta property="og:title" content="<%= site.org_name %>">
+  <meta property="og:description" content="<%= site.tagline %>">
+  <meta property="og:image" content="<%= site.hero_image %>">
+  <meta name="theme-color" content="#7a1414">
+  <link rel="icon" href="<%= site.logo %>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700;800&family=Rozha+One&display=swap">
+  <link rel="stylesheet" href="/css/site.css">
+  <% (locals.extraStyles || []).forEach((href) => { %><link rel="stylesheet" href="<%= href %>">
+  <% }) %>
+</head>
+<body>

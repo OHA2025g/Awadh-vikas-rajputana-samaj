@@ -1,0 +1,51 @@
+<%- include('../partials/header') %>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="crumbs"><a href="/">मुखपृष्ठ</a> / आवेदन की स्थिति</div>
+    <h1>आवेदन की स्थिति जाँचें</h1>
+    <p>अपना आवेदन क्रमांक एवं पंजीकृत मोबाइल नंबर लिखकर सदस्यता आवेदन की वर्तमान स्थिति देखें।</p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:40px">
+  <div class="container status-card">
+    <form class="form-card" method="post" action="/status">
+      <div class="form-section">
+        <div class="grid-2">
+          <div class="field">
+            <label for="application_no">आवेदन क्रमांक</label>
+            <input type="text" id="application_no" name="application_no" required placeholder="जैसे: AV00021" value="<%= query.application_no || '' %>">
+          </div>
+          <div class="field">
+            <label for="phone">मोबाइल नंबर</label>
+            <input type="tel" id="phone" name="phone" required inputmode="numeric" value="<%= query.phone || '' %>">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" style="margin-top:18px"><%- icon('search') %> स्थिति देखें</button>
+
+        <% if (result === 'notfound') { %>
+          <div class="status-result notfound">
+            <h3>कोई आवेदन नहीं मिला</h3>
+            <p class="hint" style="margin:0">कृपया आवेदन क्रमांक एवं मोबाइल नंबर दोबारा जाँचें।</p>
+          </div>
+        <% } else if (result) { %>
+          <div class="status-result <%= result.status %>">
+            <p style="margin:0" class="hint">आवेदन क्रमांक <%= result.application_no %> • <%= formatDate(result.created_at) %></p>
+            <h3 style="margin:6px 0"><%= result.name %></h3>
+            <span class="tag <%= result.status === 'approved' ? 'green' : result.status === 'rejected' ? 'maroon' : '' %>" style="font-size:16px"><%= STATUS_LABEL[result.status] %></span>
+            <% if (result.status === 'approved') { %>
+              <p style="margin-top:14px">बधाई हो! आपकी सदस्यता स्वीकृत हो गई है।<br>आपका सदस्य क्रमांक: <b><%= result.member_no %></b></p>
+            <% } else if (result.status === 'pending') { %>
+              <p style="margin-top:14px">आपका आवेदन समीक्षाधीन है। स्वीकृति के बाद आपको सूचित किया जाएगा।</p>
+            <% } else { %>
+              <p style="margin-top:14px">आपका आवेदन स्वीकृत नहीं हो सका।<% if (result.reject_reason) { %><br>कारण: <%= result.reject_reason %><% } %></p>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+    </form>
+  </div>
+</section>
+
+<%- include('../partials/footer') %>

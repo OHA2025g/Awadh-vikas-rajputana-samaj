@@ -1,0 +1,122 @@
+<%- include('../partials/admin-top') %>
+<% const isNew = !m.id; %>
+
+<p><a href="<%= isNew ? '/admin/meetings' : '/admin/meetings/' + m.id %>"><%- icon('chevron-left') %> <%= isNew ? 'बैठक विवरण' : m.title %></a></p>
+
+<% if (errors.length) { %>
+  <div class="flash error"><%- icon('alert') %> <span><%= errors.join(' ') %></span></div>
+<% } %>
+
+<form method="post" action="<%= isNew ? '/admin/meetings' : '/admin/meetings/' + m.id %>" enctype="multipart/form-data" id="meeting-form">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <section class="card" style="margin-bottom:18px">
+    <div class="card-head"><h2><%- icon(isNew ? 'plus' : 'edit') %> <%= pageTitle %></h2></div>
+    <div class="card-body grid cols-3">
+      <div class="field span-all">
+        <label for="f-title">बैठक का शीर्षक / विषय <span class="req">*</span></label>
+        <input type="text" id="f-title" name="title" value="<%= m.title %>" maxlength="200" required placeholder="जैसे: कार्यकारिणी समिति की मासिक बैठक — मार्च 2026">
+      </div>
+      <div class="field">
+        <label for="f-date">दिनांक <span class="req">*</span></label>
+        <input type="date" id="f-date" name="meeting_date" value="<%= m.meeting_date %>" required>
+      </div>
+      <div class="field">
+        <label for="f-time">समय</label>
+        <input type="time" id="f-time" name="meeting_time" value="<%= m.meeting_time || '' %>">
+      </div>
+      <div class="field">
+        <label for="f-committee">समिति / बैठक का प्रकार</label>
+        <select id="f-committee" name="committee_id">
+          <option value="">— सामान्य / कोई समिति नहीं —</option>
+          <% committees.forEach((c) => { %><option value="<%= c.id %>" <%= Number(m.committee_id) === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="field span-all">
+        <label for="f-venue">स्थान</label>
+        <input type="text" id="f-venue" name="venue" value="<%= m.venue || '' %>" maxlength="200" placeholder="जैसे: संघ कार्यालय, पुणे">
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:18px">
+    <div class="card-head">
+      <h2><%- icon('users') %> उपस्थित सदस्य / पदाधिकारी <span class="badge" data-att-count><%= m.attendeeList.length %></span></h2>
+      <div class="actions">
+        <button class="btn btn-outline btn-sm" type="button" data-att-committee disabled title="ऊपर समिति चुनें"><%- icon('briefcase') %> चयनित समिति के सभी सदस्य जोड़ें</button>
+        <button class="btn btn-outline btn-sm" type="button" data-att-clear><%- icon('x') %> सभी हटाएँ</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <input type="hidden" name="attendees" value="<%= JSON.stringify(m.attendeeList) %>" data-att-input>
+      <div class="grid cols-2">
+        <div class="field">
+          <label for="att-search">संघ के सदस्य जोड़ें</label>
+          <div class="member-picker" data-attendee-picker="/admin/meetings/members">
+            <div class="mp-search">
+              <span class="mp-search-ic"><%- icon('search') %></span>
+              <input type="search" id="att-search" placeholder="नाम, पद या सदस्य क्रमांक लिखें…" autocomplete="off"
+                     role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="att-list">
+              <ul class="mp-list" id="att-list" role="listbox" hidden></ul>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="att-other">अन्य व्यक्ति (अतिथि / गैर-सदस्य)</label>
+          <div class="input-with-btn">
+            <input type="text" id="att-other" maxlength="100" placeholder="नाम लिखकर Enter दबाएँ">
+            <button class="btn btn-outline" type="button" data-att-add-other><%- icon('plus') %> जोड़ें</button>
+          </div>
+        </div>
+      </div>
+      <div class="att-chips" data-att-chips></div>
+      <p class="muted small att-empty" data-att-empty>अभी कोई उपस्थित नहीं जोड़ा गया।</p>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:18px">
+    <div class="card-head">
+      <h2><%- icon('file-text') %> कार्यवाही विवरण एवं लिए गए निर्णय</h2>
+      <div class="actions"><button class="btn btn-outline btn-sm" type="button" data-minutes-template><%- icon('list') %> प्रारूप भरें</button></div>
+    </div>
+    <div class="card-body">
+      <textarea id="f-minutes" name="minutes" data-rte placeholder="बैठक की कार्यवाही, चर्चा के बिंदु एवं लिए गए निर्णय यहाँ लिखें…"><%= m.minutes || '' %></textarea>
+      <div class="hint">"प्रारूप भरें" से एजेंडा, चर्चा के बिंदु, लिए गए निर्णय और अगली बैठक के शीर्षक अपने-आप जुड़ जाते हैं।</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2><%- icon('paperclip') %> रजिस्टर / हस्ताक्षर पत्रक के स्कैन</h2></div>
+    <div class="card-body">
+      <% if (m.files.length) { %>
+        <div class="file-grid" style="margin-bottom:16px">
+          <% m.files.forEach((f) => { %>
+            <label class="file-tile">
+              <% if (f.kind === 'image') { %>
+                <img src="/admin/meetings/files/<%= f.id %>" alt="" loading="lazy">
+              <% } else { %>
+                <span class="pdf-thumb"><%- icon('file-text') %> PDF</span>
+              <% } %>
+              <span class="file-name" title="<%= f.original_name || '' %>"><%= f.original_name || (f.kind === 'pdf' ? 'PDF दस्तावेज़' : 'चित्र') %></span>
+              <span class="check small"><input type="checkbox" name="remove_files" value="<%= f.id %>"> हटाएँ</span>
+            </label>
+          <% }) %>
+        </div>
+      <% } %>
+      <label class="dropzone" data-dropzone>
+        <input type="file" name="files" accept="image/jpeg,image/png,image/webp,application/pdf" multiple data-file-input>
+        <%- icon('upload') %>
+        <strong>फ़ोटो या PDF चुनें</strong>
+        <span class="muted small">रजिस्टर के पन्ने, हस्ताक्षरित उपस्थिति पत्रक या लिखित मिनट्स — JPG, PNG या PDF (प्रति फ़ाइल अधिकतम 12 MB, एक बार में 20 फ़ाइलें)</span>
+      </label>
+      <div class="file-grid" data-file-preview></div>
+      <p class="hint"><%- icon('lock') %> ये फ़ाइलें निजी रूप से सहेजी जाती हैं और केवल लॉगिन किए हुए एडमिन ही देख सकते हैं।</p>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary btn-lg" type="submit"><%- icon('save') %> <%= isNew ? 'बैठक सहेजें' : 'बदलाव सहेजें' %></button>
+      <a class="btn btn-outline" href="<%= isNew ? '/admin/meetings' : '/admin/meetings/' + m.id %>">रद्द करें</a>
+    </div>
+  </section>
+</form>
+
+<%- include('../partials/admin-bottom', { scripts: ['/js/admin-records.js'] }) %>

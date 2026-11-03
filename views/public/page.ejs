@@ -1,0 +1,22 @@
+<%- include('../partials/header') %>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="crumbs"><a href="/">मुखपृष्ठ</a> / <%= section.title %></div>
+    <h1><%= section.title %></h1>
+    <% if (section.subtitle) { %><p><%= section.subtitle %></p><% } %>
+  </div>
+</section>
+
+<section class="section" style="padding-top:40px">
+  <div class="container">
+    <article class="article">
+      <div class="split <%= section.image ? section.layout : 'full' %>">
+        <div class="prose"><%- section.body || '' %></div>
+        <% if (section.image) { %><div class="split-media"><img src="<%= section.image %>" alt="<%= section.title %>"></div><% } %>
+      </div>
+    </article>
+  </div>
+</section>
+
+<%- include('../partials/footer') %>

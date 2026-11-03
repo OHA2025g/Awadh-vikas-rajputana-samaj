@@ -1,0 +1,133 @@
+<%- include('../partials/admin-top') %>
+<%
+  const catBadge = { lifetime: 'maroon', daan: 'gold', aayojan: 'green', other: 'gray' };
+  const statTone = { lifetime: 'maroon', daan: 'gold', aayojan: 'green', other: 'blue' };
+  const withParams = (base, changes) => {
+    const p = new URLSearchParams(qs);
+    p.delete('page');
+    for (const [k, v] of Object.entries(changes)) { if (v) p.set(k, v); else p.delete(k); }
+    const s = p.toString();
+    return base + (s ? '?' + s : '');
+  };
+  const pageUrl = (n) => '/admin/donations?' + (qs ? qs + '&' : '') + 'page=' + n;
+  const current = filters.category ? totals[filters.category] : totals.all;
+  const hasFilters = filters.mode || filters.from || filters.to || filters.q;
+%>
+
+<div class="grid cols-4 stat-money" style="margin-bottom:18px">
+  <% DONATION_CATEGORIES.forEach((c) => { %>
+    <a class="stat-card" href="<%= withParams('/admin/donations', { category: c.key }) %>">
+      <span class="si <%= statTone[c.key] %>"><%- icon(c.icon) %></span>
+      <span><strong><%= formatINR(totals[c.key].sum) %></strong><span><%= c.label %> • <%= entryCount(totals[c.key].n) %></span></span>
+    </a>
+  <% }) %>
+</div>
+
+<div class="tabs" style="margin-bottom:16px">
+  <a href="<%= withParams('/admin/donations', { category: '' }) %>" class="<%= !filters.category ? 'active' : '' %>"><%- icon('list') %> सभी <span class="badge"><%= totals.all.n %></span></a>
+  <% DONATION_CATEGORIES.forEach((c) => { %>
+    <a href="<%= withParams('/admin/donations', { category: c.key }) %>" class="<%= filters.category === c.key ? 'active' : '' %>"><%- icon(c.icon) %> <%= c.label %> <span class="badge"><%= totals[c.key].n %></span></a>
+  <% }) %>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <form class="toolbar" method="get" action="/admin/donations">
+      <% if (filters.category) { %><input type="hidden" name="category" value="<%= filters.category %>"><% } %>
+      <input type="search" name="q" value="<%= filters.q %>" placeholder="नाम, सदस्य क्रमांक, संदर्भ…">
+      <select name="mode" data-autosubmit aria-label="भुगतान प्रकार">
+        <option value="">सभी भुगतान प्रकार</option>
+        <% PAYMENT_MODES.forEach((m) => { %><option value="<%= m.key %>" <%= filters.mode === m.key ? 'selected' : '' %>><%= m.label %></option><% }) %>
+      </select>
+      <label class="date-range">से <input type="date" name="from" value="<%= filters.from %>"></label>
+      <label class="date-range">तक <input type="date" name="to" value="<%= filters.to %>"></label>
+      <button class="btn btn-outline" type="submit"><%- icon('search') %> खोजें</button>
+      <% if (hasFilters) { %><a class="btn btn-outline" href="<%= filters.category ? '/admin/donations?category=' + filters.category : '/admin/donations' %>"><%- icon('x') %> साफ़ करें</a><% } %>
+    </form>
+  </div>
+
+  <div class="card-body bulk-bar">
+    <span>
+      <b><%= filters.category ? DONATION_CATEGORY_LABEL[filters.category] : 'सभी श्रेणियाँ' %></b><%= hasFilters ? ' (फ़िल्टर लागू)' : '' %>
+      <span class="muted small"> — कुल <b><%= entryCount(current.n) %></b> • कुल राशि <b class="don-total"><%= formatINR(current.sum) %></b></span>
+    </span>
+    <div class="actions">
+      <a class="btn btn-outline btn-sm" href="/admin/donations/export.csv<%= qs ? '?' + qs : '' %>"><%- icon('download') %> CSV</a>
+      <a class="btn btn-outline btn-sm" href="/admin/donations/export.xlsx<%= qs ? '?' + qs : '' %>"><%- icon('download') %> Excel</a>
+      <a class="btn btn-primary btn-sm" href="/admin/donations/new<%= filters.category ? '?category=' + filters.category : '' %>"><%- icon('plus') %> नई प्रविष्टि</a>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width:56px">क्रम</th>
+          <th>दिनांक</th>
+          <th>सदस्य</th>
+          <% if (!filters.category) { %><th>श्रेणी</th><% } %>
+          <th style="text-align:right">राशि</th>
+          <th>भुगतान प्रकार</th>
+          <th>संदर्भ / विवरण</th>
+          <th>प्रविष्टि</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!rows.length) { %>
+          <tr><td colspan="9"><div class="empty-state"><%- icon('gift') %><p>इस फ़िल्टर में कोई प्रविष्टि नहीं मिली।</p>
+            <a class="btn btn-primary btn-sm" href="/admin/donations/new<%= filters.category ? '?category=' + filters.category : '' %>"><%- icon('plus') %> पहली प्रविष्टि जोड़ें</a></div></td></tr>
+        <% } %>
+        <% rows.forEach((d, i) => { %>
+          <tr>
+            <td class="muted"><%= pg.offset + i + 1 %></td>
+            <td class="nowrap"><%= formatDate(d.paid_on, 'short') %></td>
+            <td>
+              <div class="cell-main"><%= d.name %>
+                <% if (d.anonymous) { %><span class="badge gray" title="वेबसाइट पर नाम नहीं दिखेगा">गुप्त दान</span><% } %>
+              </div>
+              <div class="cell-sub mono"><%= d.member_no || (d.member_id ? '' : 'सदस्य हटाया गया') %></div>
+            </td>
+            <% if (!filters.category) { %><td><span class="badge <%= catBadge[d.category] %>"><%= DONATION_CATEGORY_LABEL[d.category] %></span></td><% } %>
+            <td class="nowrap" style="text-align:right"><b class="don-total"><%= formatINR(d.amount_paise) %></b></td>
+            <td class="nowrap"><%= PAYMENT_MODE_LABEL[d.payment_mode] %></td>
+            <td>
+              <% if (d.reference) { %><div class="mono small"><%= d.reference %></div><% } %>
+              <% if (d.details) { %><div class="cell-sub"><%= d.details %></div><% } %>
+              <% if (!d.reference && !d.details) { %><span class="muted">—</span><% } %>
+            </td>
+            <td>
+              <div class="small"><%= d.admin_name || d.admin_username || '—' %></div>
+              <div class="cell-sub"><%= d.updated_at ? 'संपादित ' + formatDate(d.updated_at, 'short') : formatDate(d.created_at, 'short') %></div>
+            </td>
+            <td>
+              <div class="actions">
+                <a class="btn btn-outline btn-sm btn-icon" href="/admin/donations/<%= d.id %>/edit" title="संपादित करें"><%- icon('edit') %></a>
+                <% if (isSuper) { %>
+                  <form method="post" action="/admin/donations/<%= d.id %>/delete" class="inline-form" data-confirm="<%= d.name %> की <%= formatINR(d.amount_paise) %> की प्रविष्टि स्थायी रूप से हटाएँ?">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="btn btn-outline btn-sm btn-icon" type="submit" title="हटाएँ"><%- icon('trash') %></button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <% if (pg.pages > 1) { %>
+    <nav class="pager">
+      <% if (pg.page > 1) { %><a href="<%= pageUrl(pg.page - 1) %>"><%- icon('chevron-left') %></a><% } %>
+      <% for (let i = Math.max(1, pg.page - 3); i <= Math.min(pg.pages, pg.page + 3); i++) { %>
+        <% if (i === pg.page) { %><span class="current"><%= i %></span><% } else { %><a href="<%= pageUrl(i) %>"><%= i %></a><% } %>
+      <% } %>
+      <% if (pg.page < pg.pages) { %><a href="<%= pageUrl(pg.page + 1) %>"><%- icon('chevron-right') %></a><% } %>
+    </nav>
+  <% } %>
+</div>
+
+<p class="muted small" style="margin-top:12px"><%- icon('info') %> सार्वजनिक "दान" पृष्ठ पर नाम, राशि, भुगतान प्रकार, दिनांक, विवरण तथा संदर्भ संख्या के केवल अंतिम 4 अंक दिखते हैं। गुप्त दान में नाम नहीं दिखता।<% if (!isSuper) { %> प्रविष्टि हटाने का अधिकार केवल मुख्य एडमिन को है।<% } %></p>
+
+<%- include('../partials/admin-bottom') %>

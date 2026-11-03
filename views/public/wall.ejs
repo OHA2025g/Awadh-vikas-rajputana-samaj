@@ -1,0 +1,119 @@
+<%- include('../partials/header') %>
+<% const tagClass = { announcement: 'maroon', achievement: 'gold', event: 'green', general: 'blue' }; %>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="crumbs"><a href="/">मुखपृष्ठ</a> / सामुदायिक मंच</div>
+    <h1>सामुदायिक मंच</h1>
+    <p>संघ की घोषणाएँ, कार्यक्रमों के समाचार, समाज की उपलब्धियाँ एवं सदस्यों की चर्चाएँ।</p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:40px">
+  <div class="container wall-layout">
+    <div>
+      <div class="wall-cats">
+        <a class="chip <%= !cat ? 'active' : '' %>" href="/wall">सभी</a>
+        <% for (const c of POST_CATEGORIES) { %>
+          <a class="chip <%= cat === c.key ? 'active' : '' %>" href="/wall?cat=<%= c.key %>"><%= c.label %></a>
+        <% } %>
+      </div>
+
+      <% if (!posts.length) { %>
+        <div class="empty"><%- icon('message-circle') %><p>इस श्रेणी में अभी कोई पोस्ट नहीं है।</p></div>
+      <% } %>
+
+      <% for (const p of posts) { %>
+        <article class="post <%= p.pinned ? 'pinned' : '' %>" id="post-<%= p.id %>">
+          <div class="post-head">
+            <% if (p.member_photo) { %><img class="post-avatar" src="<%= p.member_photo %>" alt=""><% } else if (!p.member_id) { %><img class="post-avatar" src="<%= site.logo %>" alt="" style="background:#fff"><% } else { %><span class="post-avatar"><%= initials(p.author_name) %></span><% } %>
+            <div>
+              <div class="post-author"><%= p.author_name || site.org_name %></div>
+              <div class="post-time"><%= relativeTime(p.created_at) %><%= p.pinned ? ' • 📌 पिन की गई' : '' %></div>
+            </div>
+            <span class="tag <%= tagClass[p.category] || '' %>"><%= POST_CATEGORY_LABEL[p.category] %></span>
+          </div>
+          <div class="post-body">
+            <% if (p.title) { %><h3><%= p.title %></h3><% } %>
+            <p><%= p.body %></p>
+          </div>
+          <% if (p.image) { %><img class="post-image" src="<%= p.image %>" alt="<%= p.title || '' %>" loading="lazy"><% } %>
+          <div class="post-actions">
+            <button class="post-action <%= p.liked ? 'liked' : '' %>" type="button" data-like="<%= p.id %>"><%- icon('thumbs-up') %> <span><%= p.likes %></span> पसंद</button>
+            <button class="post-action" type="button" data-toggle-comments="<%= p.id %>"><%- icon('message-circle') %> <span data-comment-count><%= p.comments.length %></span> टिप्पणियाँ</button>
+          </div>
+          <div class="comments" id="comments-<%= p.id %>">
+            <div data-comment-list>
+              <% for (const c of p.comments) { %>
+                <div class="comment">
+                  <span class="post-avatar"><%= initials(c.name) %></span>
+                  <div class="comment-bubble"><b><%= c.name %></b><%= c.body %><br><small><%= relativeTime(c.created_at) %></small></div>
+                </div>
+              <% } %>
+            </div>
+            <form class="comment-form" data-comment-form="<%= p.id %>">
+              <input type="text" name="name" placeholder="आपका नाम" maxlength="60" required>
+              <input type="text" name="body" placeholder="टिप्पणी लिखें…" maxlength="1000" required>
+              <input class="hp-field" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button class="btn btn-primary btn-sm" type="submit"><%- icon('send') %></button>
+            </form>
+          </div>
+        </article>
+      <% } %>
+
+      <% if (pg.pages > 1) { %>
+        <nav class="pager">
+          <% for (let i = 1; i <= pg.pages; i++) { %>
+            <% if (i === pg.page) { %><span class="current"><%= i %></span><% } else { %><a href="/wall?page=<%= i %><%= cat ? '&cat=' + cat : '' %>"><%= i %></a><% } %>
+          <% } %>
+        </nav>
+      <% } %>
+    </div>
+
+    <aside class="join-aside">
+      <% if (site.wall_member_posts) { %>
+        <div class="aside-card">
+          <h4><%- icon('edit') %> अपनी बात साझा करें</h4>
+          <p class="hint">पंजीकृत सदस्य अपनी उपलब्धियाँ, समाचार एवं सुझाव मंच पर साझा कर सकते हैं। पोस्ट एडमिन की स्वीकृति के बाद प्रकाशित होगी।</p>
+          <button class="btn btn-primary btn-block" type="button" data-open-modal="post-modal"><%- icon('plus') %> नई पोस्ट लिखें</button>
+        </div>
+      <% } %>
+      <div class="aside-card">
+        <h4><%- icon('users') %> अभी सदस्य नहीं हैं?</h4>
+        <p class="hint">संघ से जुड़ें और समाज की हर गतिविधि का हिस्सा बनें।</p>
+        <a class="btn btn-outline btn-block" href="/join">सदस्यता आवेदन</a>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<% if (site.wall_member_posts) { %>
+<div class="modal" id="post-modal" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="post-modal-title">नई पोस्ट</h3>
+      <button class="icon-btn" type="button" data-close-modal aria-label="बंद करें"><%- icon('x') %></button>
+    </div>
+    <form class="modal-body" id="post-form" enctype="multipart/form-data">
+      <div class="alert alert-info" style="margin:0"><%- icon('info') %><span>पहचान हेतु अपना सदस्य क्रमांक एवं पंजीकृत मोबाइल नंबर लिखें।</span></div>
+      <div class="alert alert-error" id="post-error" hidden style="margin:0"><%- icon('alert') %><span></span></div>
+      <div class="grid-2">
+        <div class="field"><label for="pm-no">सदस्य क्रमांक</label><input type="text" id="pm-no" name="member_no" required placeholder="ARVS-0001"></div>
+        <div class="field"><label for="pm-phone">मोबाइल नंबर</label><input type="tel" id="pm-phone" name="phone" required inputmode="numeric"></div>
+      </div>
+      <div class="field">
+        <label for="pm-cat">श्रेणी</label>
+        <select id="pm-cat" name="category">
+          <% for (const c of POST_CATEGORIES.filter((c) => c.key !== 'announcement')) { %><option value="<%= c.key %>"><%= c.label %></option><% } %>
+        </select>
+      </div>
+      <div class="field"><label for="pm-title">शीर्षक</label><input type="text" id="pm-title" name="title" maxlength="120"></div>
+      <div class="field"><label for="pm-body">विवरण</label><textarea id="pm-body" name="body" rows="4" maxlength="3000" required></textarea></div>
+      <div class="field"><label for="pm-image">फोटो (वैकल्पिक)</label><input type="file" id="pm-image" name="image" accept="image/jpeg,image/png,image/webp"></div>
+      <button class="btn btn-primary" type="submit"><%- icon('send') %> समीक्षा हेतु भेजें</button>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<%- include('../partials/footer', { scripts: ['/js/wall.js'] }) %>

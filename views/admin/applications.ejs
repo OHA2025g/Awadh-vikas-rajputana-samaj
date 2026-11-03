@@ -1,0 +1,71 @@
+<%- include('../partials/admin-top') %>
+
+<div class="card">
+  <div class="card-head">
+    <div class="tabs">
+      <a href="/admin/applications" class="<%= status === 'pending' ? 'active' : '' %>"><%- icon('clock') %> लंबित <span class="badge"><%= badges.applications %></span></a>
+      <a href="/admin/applications?status=rejected" class="<%= status === 'rejected' ? 'active' : '' %>"><%- icon('x') %> अस्वीकृत</a>
+    </div>
+    <div class="actions">
+      <a class="btn btn-outline btn-sm" href="/join" target="_blank" rel="noopener"><%- icon('external-link') %> आवेदन फ़ॉर्म देखें</a>
+    </div>
+  </div>
+  <div class="card-body tight">
+    <% if (!rows.length) { %>
+      <div class="empty-state">
+        <%- icon(status === 'pending' ? 'check' : 'info') %>
+        <p><%= status === 'pending' ? 'कोई लंबित आवेदन नहीं है — सब समीक्षित हो चुके हैं।' : 'कोई अस्वीकृत आवेदन नहीं है।' %></p>
+      </div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>आवेदक</th>
+              <th>माता / पिता या पति</th>
+              <th>स्थायी पता (उ.प्र.)</th>
+              <th>मोबाइल</th>
+              <th>आवेदन तिथि</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          <% rows.forEach((m) => { %>
+            <tr>
+              <td>
+                <div class="who-cell">
+                  <% if (m.photo) { %><img class="thumb round" src="<%= m.photo %>" alt=""><% } else { %><span class="thumb round"><%= initials(m.name) %></span><% } %>
+                  <div>
+                    <div class="cell-main"><a href="/admin/applications/<%= m.id %>"><%= m.salutation || '' %> <%= m.name %></a></div>
+                    <div class="cell-sub mono"><%= m.application_no %><% if (m.city) { %> · <%= m.city %><% } %></div>
+                  </div>
+                </div>
+              </td>
+              <td><%= m.father_name || '—' %><% if (m.age) { %><div class="cell-sub">उम्र <%= m.age %></div><% } %></td>
+              <td><%= [m.perm_village, m.perm_district].filter(Boolean).join(', ') || '—' %><div class="cell-sub"><%= m.vidhan_sabha ? 'विधानसभा: ' + m.vidhan_sabha : '' %></div></td>
+              <td class="nowrap mono"><%= isSuper ? formatPhone(m.phone) : maskPhone(m.phone) %></td>
+              <td class="nowrap small"><%= formatDate(m.created_at, 'short') %><div class="cell-sub"><%= relativeTime(m.created_at) %></div></td>
+              <td>
+                <div class="actions">
+                  <a class="btn btn-primary btn-sm" href="/admin/applications/<%= m.id %>"><%- icon('eye') %> समीक्षा</a>
+                  <% if (status === 'pending') { %>
+                    <form method="post" action="/admin/applications/<%= m.id %>/approve" class="inline-form" data-confirm="<%= m.name %> का आवेदन 'सदस्य' श्रेणी में स्वीकृत करें?">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="back" value="list">
+                      <button class="btn btn-green btn-sm" type="submit" title="त्वरित स्वीकृति"><%- icon('check') %></button>
+                    </form>
+                  <% } else if (m.reject_reason) { %>
+                    <span class="muted small" title="<%= m.reject_reason %>"><%- icon('info') %></span>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../partials/admin-bottom') %>

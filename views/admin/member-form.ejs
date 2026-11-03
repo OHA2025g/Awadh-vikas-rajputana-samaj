@@ -1,0 +1,192 @@
+<%- include('../partials/admin-top') %>
+<%
+  const isNew = !m.id;
+  const val = (k) => (m[k] ?? '');
+  const phoneInput = (p) => {
+    const digits = String(p || '').replace(/\D/g, '');
+    return digits.length > 10 ? digits.slice(-10) : String(p || '');
+  };
+  const certLog = locals.certLog || [];
+%>
+
+<p><a href="/admin/members"><%- icon('chevron-left') %> सदस्य सूची</a></p>
+
+<% if (errors.length) { %>
+  <div class="flash error"><%- icon('alert') %> <span><%= errors.join(' ') %></span></div>
+<% } %>
+
+<form method="post" action="<%= isNew ? '/admin/members' : '/admin/members/' + m.id %>" enctype="multipart/form-data">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <div class="grid cols-3">
+    <div class="span-2">
+      <section class="card">
+        <div class="card-head">
+          <h2><%- icon('file-text') %> सदस्यता फॉर्म</h2>
+          <div class="actions">
+            <% if (m.member_no) { %><span class="badge solid mono"><%= m.member_no %></span><% } %>
+            <% if (!isNew) { %><a class="btn btn-outline btn-sm" href="/admin/members/<%= m.id %>/form" target="_blank" rel="noopener"><%- icon('printer') %> फॉर्म प्रिंट</a><% } %>
+          </div>
+        </div>
+        <% if (!isSuper) { %>
+          <div class="flash info" style="margin:14px 20px 0"><%- icon('lock') %> <span>मोबाइल, आधार नंबर व परिवार / रिलेशन की तालिकाएँ केवल मुख्य एडमिन बदल सकते हैं।</span></div>
+        <% } %>
+        <div class="card-body">
+          <%- include('../partials/membership-form', { mf: { mode: 'edit', m, secure: isSuper, dateText: formDate } }) %>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2><%- icon('user') %> अतिरिक्त जानकारी <small class="muted">(छपे फॉर्म में नहीं)</small></h2></div>
+        <div class="card-body grid cols-3">
+          <div class="field">
+            <label for="salutation">संबोधन</label>
+            <select id="salutation" name="salutation">
+              <option value="">—</option>
+              <% SALUTATIONS.forEach((s) => { %><option <%= val('salutation') === s ? 'selected' : '' %>><%= s %></option><% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="name_en">नाम (अंग्रेज़ी)</label>
+            <input type="text" id="name_en" name="name_en" value="<%= val('name_en') %>" maxlength="80">
+          </div>
+          <% if (isSuper) { %>
+            <div class="field">
+              <label for="whatsapp">व्हाट्सऐप</label>
+              <input type="tel" id="whatsapp" name="whatsapp" value="<%= phoneInput(m.whatsapp) %>" maxlength="15" inputmode="numeric" placeholder="खाली = मोबाइल नंबर">
+            </div>
+          <% } else { %>
+            <div class="field">
+              <span class="label">व्हाट्सऐप</span>
+              <div class="mono" style="padding:9px 0"><%= maskPhone(m.whatsapp || m.phone) %></div>
+            </div>
+          <% } %>
+          <div class="field">
+            <label for="gender">लिंग</label>
+            <select id="gender" name="gender">
+              <option value="">—</option>
+              <% GENDERS.forEach((g) => { %><option <%= val('gender') === g ? 'selected' : '' %>><%= g %></option><% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="dob">जन्म तिथि</label>
+            <input type="date" id="dob" name="dob" value="<%= val('dob') %>">
+          </div>
+          <div class="field">
+            <label for="city">शहर / क्षेत्र (निर्देशिका में)</label>
+            <input type="text" id="city" name="city" value="<%= val('city') %>" maxlength="60" placeholder="खाली = विधानसभा / जिला">
+          </div>
+          <div class="field">
+            <label for="native_place">पैतृक स्थान</label>
+            <input type="text" id="native_place" name="native_place" value="<%= val('native_place') %>" maxlength="100" placeholder="खाली = ग्राम, जिला">
+          </div>
+          <div class="field">
+            <label for="occupation">व्यवसाय</label>
+            <input type="text" id="occupation" name="occupation" value="<%= val('occupation') %>" maxlength="80">
+          </div>
+          <div class="field">
+            <label for="education">शिक्षा</label>
+            <input type="text" id="education" name="education" value="<%= val('education') %>" maxlength="80">
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2><%- icon('file-text') %> आंतरिक टिप्पणी</h2></div>
+        <div class="card-body">
+          <textarea name="admin_notes" rows="3" maxlength="1000" placeholder="केवल एडमिन को दिखेगी"><%= val('admin_notes') %></textarea>
+        </div>
+      </section>
+    </div>
+
+    <div>
+      <section class="card">
+        <div class="card-head"><h2><%- icon('award') %> सदस्यता</h2></div>
+        <div class="card-body stack">
+          <div class="field">
+            <label for="category">श्रेणी</label>
+            <select id="category" name="category">
+              <% CATEGORIES.forEach((c) => { %><option value="<%= c.key %>" <%= val('category') === c.key ? 'selected' : '' %>><%= c.label %> — <%= c.desc %></option><% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="designation">पद</label>
+            <input type="text" id="designation" name="designation" value="<%= val('designation') %>" maxlength="80" placeholder="जैसे: अध्यक्ष, सचिव, कोषाध्यक्ष">
+          </div>
+          <div class="field">
+            <label for="mandal_id">मंडल</label>
+            <select id="mandal_id" name="mandal_id">
+              <option value="">— चुनें —</option>
+              <% mandals.forEach((md) => { %><option value="<%= md.id %>" <%= Number(m.mandal_id) === md.id ? 'selected' : '' %>><%= md.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="committee_id">समिति</label>
+            <select id="committee_id" name="committee_id">
+              <option value="">— कोई नहीं —</option>
+              <% committees.forEach((c) => { %><option value="<%= c.id %>" <%= Number(m.committee_id) === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="sort_order">क्रम (निर्देशिका में ऊपर दिखाने हेतु छोटा अंक)</label>
+            <input type="number" id="sort_order" name="sort_order" value="<%= val('sort_order') || 0 %>">
+          </div>
+          <% if (!isNew) { %>
+            <div class="field">
+              <label for="status">स्थिति</label>
+              <select id="status" name="status">
+                <% ['approved', 'pending', 'rejected'].forEach((s) => { %><option value="<%= s %>" <%= m.status === s ? 'selected' : '' %>><%= STATUS_LABEL[s] %></option><% }) %>
+              </select>
+            </div>
+          <% } %>
+          <label class="check"><input type="checkbox" name="show_in_directory" value="1" <%= Number(m.show_in_directory) ? 'checked' : '' %>> सार्वजनिक निर्देशिका में दिखाएँ</label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2><%- icon('image') %> फोटो</h2></div>
+        <div class="card-body stack">
+          <img id="photo-prev" class="photo-box" src="<%= m.photo || '' %>" alt="" <%= m.photo ? '' : 'hidden' %>>
+          <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" data-preview="#photo-prev">
+          <% if (m.photo) { %><label class="check small"><input type="checkbox" name="remove_photo" value="1"> फोटो हटाएँ</label><% } %>
+        </div>
+      </section>
+
+      <% if (!isNew && m.status === 'approved') { %>
+      <section class="card">
+        <div class="card-head">
+          <h2><%- icon('printer') %> प्रमाण पत्र</h2>
+          <div class="actions"><a class="btn btn-maroon btn-sm" href="/admin/certificates?ids=<%= m.id %>">प्रिंट करें</a></div>
+        </div>
+        <div class="card-body">
+          <% if (!certLog.length) { %>
+            <p class="muted small" style="margin:0">अभी तक प्रमाण पत्र नहीं छपा।</p>
+          <% } else { %>
+            <p class="small" style="margin-top:0">कुल <b><%= m.cert_print_count %></b> बार छपा<% if (m.cert_serial) { %> · क्रम संख्या <b><%= m.cert_serial %></b><% } %></p>
+            <ul class="small muted" style="margin:0;padding-left:1.1em">
+              <% certLog.forEach((l) => { %><li><%= formatDate(l.printed_at, 'datetime') %><%= l.serial ? ' (क्र. ' + l.serial + ')' : '' %> — <%= l.admin_name || 'एडमिन' %></li><% }) %>
+            </ul>
+          <% } %>
+        </div>
+      </section>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="form-actions">
+      <button class="btn btn-primary btn-lg" type="submit"><%- icon('save') %> <%= isNew ? 'सदस्य जोड़ें' : 'परिवर्तन सहेजें' %></button>
+      <a class="btn btn-outline" href="/admin/members">रद्द करें</a>
+      <% if (!isNew && isSuper) { %>
+        <button class="btn btn-danger right" type="submit" form="delete-form"><%- icon('trash') %> सदस्य हटाएँ</button>
+      <% } %>
+    </div>
+  </div>
+</form>
+
+<% if (!isNew && isSuper) { %>
+  <form id="delete-form" method="post" action="/admin/members/<%= m.id %>/delete" data-confirm="<%= m.name %> को स्थायी रूप से हटाएँ? यह पूर्ववत नहीं होगा।">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  </form>
+<% } %>
+
+<%- include('../partials/admin-bottom') %>

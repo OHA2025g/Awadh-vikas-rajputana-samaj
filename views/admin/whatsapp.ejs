@@ -1,0 +1,165 @@
+<%- include('../partials/admin-top') %>
+<script type="application/json" id="wa-config"><%- JSON.stringify({ gateway, broadcasts, isSuper, provider: cfg.provider }).replace(/</g, '\\u003c') %></script>
+
+<div class="grid cols-3">
+  <!-- Compose -->
+  <section class="card span-2">
+    <div class="card-head"><h2><%- icon('send') %> नया प्रसारण संदेश</h2></div>
+    <div class="card-body stack">
+      <div>
+        <div class="label" style="font-weight:600;margin-bottom:6px">किसे भेजना है?</div>
+        <div class="target-opts">
+          <label><input type="radio" name="target-type" value="all" checked> <%- icon('users') %> सभी सदस्य</label>
+          <label><input type="radio" name="target-type" value="mandal"> <%- icon('map-pin') %> विशिष्ट मंडल</label>
+          <label><input type="radio" name="target-type" value="committee"> <%- icon('briefcase') %> विशिष्ट समिति</label>
+          <label><input type="radio" name="target-type" value="category"> <%- icon('award') %> श्रेणी</label>
+        </div>
+        <div class="checklist" data-target-list="mandal" hidden>
+          <% mandals.forEach((m) => { %><label><input type="checkbox" name="mandals" value="<%= m.id %>"> <%= m.name %></label><% }) %>
+        </div>
+        <div class="checklist" data-target-list="committee" hidden>
+          <% committees.forEach((c) => { %><label><input type="checkbox" name="committees" value="<%= c.id %>"> <%= c.name %></label><% }) %>
+        </div>
+        <div class="checklist" data-target-list="category" hidden>
+          <% CATEGORIES.forEach((c) => { %><label><input type="checkbox" name="categories" value="<%= c.key %>"> <%= c.label %></label><% }) %>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="wa-message">संदेश</label>
+        <div class="var-chips">
+          <% variables.forEach((v) => { %><button type="button" data-var="<%= v.tag %>" title="<%= v.label %>"><%= v.tag %></button><% }) %>
+        </div>
+        <textarea id="wa-message" rows="8" maxlength="4000" placeholder="जय माँ भवानी {salutation} {member_name} जी, …"></textarea>
+        <div class="hint">ऊपर के टैग पर क्लिक करके जोड़ें — हर सदस्य को उसके अपने नाम आदि के साथ संदेश जाएगा। *बोल्ड* और _इटैलिक_ व्हाट्सऐप फ़ॉर्मेटिंग मान्य है।</div>
+      </div>
+
+      <div class="grid cols-2">
+        <div>
+          <div class="label" style="font-weight:600;margin-bottom:6px">पूर्वावलोकन (पहले प्राप्तकर्ता के लिए)</div>
+          <div class="wa-preview"><div class="wa-bubble" id="wa-preview">संदेश लिखें…</div></div>
+        </div>
+        <div>
+          <div class="label" style="font-weight:600;margin-bottom:6px">प्राप्तकर्ता: <span class="badge solid" id="wa-count">0</span> <span class="muted small" id="wa-label"></span></div>
+          <div class="recipient-list" id="wa-recipients"><div class="muted small">—</div></div>
+          <div class="hint"><%- icon('lock') %> गोपनीयता हेतु नंबर छिपे हुए दिखाए जाते हैं; संदेश सीधे सर्वर से भेजे जाते हैं।</div>
+        </div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-green btn-lg" type="button" id="wa-send"><%- icon('whatsapp') %> प्रसारण भेजें</button>
+      <span class="muted small">संदेशों के बीच <%= cfg.delay_min %>–<%= cfg.delay_max %> सेकंड का अंतर रखा जाता है ताकि नंबर ब्लॉक न हो।</span>
+    </div>
+  </section>
+
+  <!-- Gateway -->
+  <div>
+    <section class="card">
+      <div class="card-head"><h2><%- icon('smartphone') %> व्हाट्सऐप गेटवे</h2></div>
+      <div class="card-body stack">
+        <div class="wa-status">
+          <span class="wa-dot" id="gw-dot"></span>
+          <div>
+            <b id="gw-title"></b>
+            <div class="muted small" id="gw-message"></div>
+          </div>
+        </div>
+        <div id="gw-baileys" <%= cfg.provider === 'baileys' ? '' : 'hidden' %>>
+          <div class="qr-box" id="gw-qr"><span><%- icon('smartphone') %><br>"कनेक्ट करें" दबाएँ, फिर फ़ोन से QR स्कैन करें</span></div>
+          <div class="toolbar" style="margin-top:12px">
+            <button class="btn btn-primary" type="button" id="gw-connect"><%- icon('link') %> कनेक्ट करें</button>
+            <button class="btn btn-outline" type="button" id="gw-disconnect"><%- icon('power') %> डिस्कनेक्ट</button>
+            <% if (isSuper) { %><button class="btn btn-danger btn-sm" type="button" id="gw-logout" title="फ़ोन से लिंक हटाएँ"><%- icon('log-out') %> लॉग-आउट</button><% } %>
+          </div>
+          <p class="hint">फ़ोन में व्हाट्सऐप → सेटिंग → <b>लिंक्ड डिवाइस</b> → <b>डिवाइस लिंक करें</b>। संस्था का एक अलग नंबर उपयोग करना बेहतर है।</p>
+        </div>
+      </div>
+    </section>
+
+    <% if (isSuper) { %>
+    <form class="card" method="post" action="/admin/whatsapp/config">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="card-head"><h2><%- icon('sliders') %> गेटवे सेटिंग</h2></div>
+      <div class="card-body stack">
+        <div class="field">
+          <label for="provider">माध्यम</label>
+          <select id="provider" name="provider">
+            <option value="baileys" <%= cfg.provider === 'baileys' ? 'selected' : '' %>>QR गेटवे (स्वयं-होस्टेड, Baileys)</option>
+            <option value="cloud" <%= cfg.provider === 'cloud' ? 'selected' : '' %>>Meta WhatsApp Cloud API (आधिकारिक)</option>
+            <option value="none" <%= cfg.provider === 'none' ? 'selected' : '' %>>बंद</option>
+          </select>
+        </div>
+        <div class="stack" data-provider-fields="cloud" <%= cfg.provider === 'cloud' ? '' : 'hidden' %>>
+          <div class="field">
+            <label for="cloud_phone_id">Phone Number ID</label>
+            <input type="text" id="cloud_phone_id" name="cloud_phone_id" value="<%= cfg.cloud_phone_id || '' %>" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="cloud_token">Permanent Access Token</label>
+            <input type="password" id="cloud_token" name="cloud_token" value="<%= cfg.cloud_token %>" autocomplete="new-password">
+            <% if (hasToken) { %><label class="check small"><input type="checkbox" name="clear_token" value="1"> टोकन हटाएँ</label><% } %>
+          </div>
+          <div class="grid cols-2">
+            <div class="field">
+              <label for="cloud_template">टेम्पलेट नाम</label>
+              <input type="text" id="cloud_template" name="cloud_template" value="<%= cfg.cloud_template || '' %>" placeholder="वैकल्पिक">
+            </div>
+            <div class="field">
+              <label for="cloud_lang">भाषा कोड</label>
+              <input type="text" id="cloud_lang" name="cloud_lang" value="<%= cfg.cloud_lang || 'hi' %>">
+            </div>
+          </div>
+          <div class="field">
+            <label for="cloud_api_version">Graph API संस्करण</label>
+            <input type="text" id="cloud_api_version" name="cloud_api_version" value="<%= cfg.cloud_api_version %>">
+          </div>
+          <p class="hint">24 घंटे की बातचीत विंडो के बाहर संदेश भेजने के लिए Meta द्वारा स्वीकृत टेम्पलेट (एक {{1}} पैरामीटर वाला) आवश्यक है — पूरा व्यक्तिगत संदेश उसी पैरामीटर में भेजा जाता है।</p>
+        </div>
+        <div class="grid cols-2">
+          <div class="field">
+            <label for="delay_min">न्यूनतम अंतर (सेकंड)</label>
+            <input type="number" id="delay_min" name="delay_min" value="<%= cfg.delay_min %>" min="1" max="120">
+          </div>
+          <div class="field">
+            <label for="delay_max">अधिकतम अंतर (सेकंड)</label>
+            <input type="number" id="delay_max" name="delay_max" value="<%= cfg.delay_max %>" min="1" max="300">
+          </div>
+        </div>
+      </div>
+      <div class="form-actions"><button class="btn btn-primary" type="submit"><%- icon('save') %> सहेजें</button></div>
+    </form>
+
+    <section class="card">
+      <div class="card-head"><h2><%- icon('message-circle') %> परीक्षण संदेश</h2></div>
+      <div class="card-body stack">
+        <input type="tel" id="test-phone" placeholder="अपना मोबाइल नंबर" inputmode="numeric" maxlength="15">
+        <button class="btn btn-outline" type="button" id="test-send"><%- icon('send') %> परीक्षण भेजें</button>
+      </div>
+    </section>
+    <% } %>
+  </div>
+</div>
+
+<section class="card">
+  <div class="card-head"><h2><%- icon('clock') %> प्रसारण इतिहास</h2></div>
+  <div class="card-body tight table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>समय</th><th>लक्ष्य</th><th>संदेश</th><th>प्रगति</th><th>स्थिति</th><th></th></tr>
+      </thead>
+      <tbody id="wa-history"></tbody>
+    </table>
+  </div>
+</section>
+
+<div class="modal" id="bc-modal">
+  <div class="modal-box">
+    <div class="card-head">
+      <h3 id="bc-modal-title">प्रसारण विवरण</h3>
+      <div class="actions"><button class="btn btn-outline btn-icon btn-sm" type="button" data-close-modal aria-label="बंद करें"><%- icon('x') %></button></div>
+    </div>
+    <div class="card-body" id="bc-modal-body"></div>
+  </div>
+</div>
+
+<%- include('../partials/admin-bottom', { scripts: ['/js/whatsapp.js'] }) %>

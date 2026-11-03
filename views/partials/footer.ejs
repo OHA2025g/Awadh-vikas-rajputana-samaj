@@ -1,0 +1,61 @@
+</main>
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand">
+          <img src="<%= site.logo %>" alt="">
+          <strong><%= site.org_name %></strong>
+        </div>
+        <p><%= site.footer_about %></p>
+        <div class="social">
+          <% if (site.facebook) { %><a href="<%= site.facebook %>" target="_blank" rel="noopener" aria-label="Facebook"><%- icon('facebook') %></a><% } %>
+          <% if (site.instagram) { %><a href="<%= site.instagram %>" target="_blank" rel="noopener" aria-label="Instagram"><%- icon('instagram') %></a><% } %>
+          <% if (site.youtube) { %><a href="<%= site.youtube %>" target="_blank" rel="noopener" aria-label="YouTube"><%- icon('youtube') %></a><% } %>
+          <% if (site.whatsapp) { %><a href="https://wa.me/<%= site.whatsapp.replace(/\D/g, '') %>" target="_blank" rel="noopener" aria-label="WhatsApp"><%- icon('whatsapp') %></a><% } %>
+        </div>
+      </div>
+      <div>
+        <h4>त्वरित लिंक</h4>
+        <ul class="footer-links">
+          <li><a href="/#about">हमारे बारे में</a></li>
+          <li><a href="/#vision-mission">दृष्टि एवं ध्येय</a></li>
+          <li><a href="/#leadership">नेतृत्व एवं संस्थापक</a></li>
+          <li><a href="/#programs">कार्यक्रम एवं उद्देश्य</a></li>
+          <li><a href="/events">गतिविधियाँ एवं आयोजन</a></li>
+          <li><a href="/donations">दान एवं सहयोग</a></li>
+          <% for (const p of navPages) { %><li><a href="/page/<%= p.slug %>"><%= p.nav_label || p.title %></a></li><% } %>
+        </ul>
+      </div>
+      <div>
+        <h4>सदस्यता</h4>
+        <ul class="footer-links">
+          <li><a href="/join">ऑनलाइन आवेदन</a></li>
+          <li><a href="/status">आवेदन की स्थिति</a></li>
+          <li><a href="/directory?category=pramukh">प्रमुख</a></li>
+          <li><a href="/directory?category=padadhikari">पदाधिकारी</a></li>
+          <li><a href="/directory?category=sadasya">सदस्य</a></li>
+          <li><a href="/wall">सामुदायिक मंच</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>संपर्क</h4>
+        <ul class="footer-links">
+          <li><%- icon('map-pin') %> <%= site.address %></li>
+          <% if (site.phone) { %><li><%- icon('phone') %> <a href="<%= telHref(site.phone) %>"><%= site.phone %></a></li><% } %>
+          <% if (site.email) { %><li><%- icon('mail') %> <a href="mailto:<%= site.email %>"><%= site.email %></a></li><% } %>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© <%= new Date().getFullYear() %> <%= site.org_name %>, <%= site.city %> — सर्वाधिकार सुरक्षित।</span>
+      <span><%= site.slogan %></span>
+    </div>
+  </div>
+</footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="/js/site.js"></script>
+<% for (const src of (typeof scripts !== 'undefined' ? scripts : [])) { %><script src="<%= src %>"></script>
+<% } %>
+</body>
+</html>

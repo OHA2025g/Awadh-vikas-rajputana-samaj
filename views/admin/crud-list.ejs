@@ -1,0 +1,84 @@
+<%- include('../partials/admin-top') %>
+<%
+  const truncate = (v, n) => { const s = String(v ?? ''); return s.length > n ? s.slice(0, n) + '…' : s; };
+  const cell = (col, row) => {
+    const v = row[col.key];
+    switch (col.type) {
+      case 'image': return null;
+      case 'bool': return v ? '✓' : '—';
+      case 'date': return v ? formatDate(v, 'long') : '—';
+      default:
+        if (col.map) return col.map[v] || v || '—';
+        return col.truncate ? truncate(v, col.truncate) || '—' : (v || '—');
+    }
+  };
+  const groupKey = r.groupField;
+%>
+
+<div class="card">
+  <div class="card-head">
+    <h2><%= r.title %></h2>
+    <div class="actions"><a class="btn btn-primary btn-sm" href="/admin/r/<%= resKey %>/new"><%- icon('plus') %> नया <%= r.singular %></a></div>
+  </div>
+  <% if (r.help) { %><div class="card-body" style="padding-bottom:0"><p class="hint" style="margin-top:0"><%= r.help %></p></div><% } %>
+  <div class="card-body tight table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <% if (r.sortable) { %><th style="width:84px">क्रम</th><% } %>
+          <% r.columns.forEach((c) => { %><th><%= c.label || '' %></th><% }) %>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      <% if (!rows.length) { %>
+        <tr><td colspan="<%= r.columns.length + 2 %>"><div class="empty-state"><%- icon('info') %><p>अभी कोई प्रविष्टि नहीं है।</p></div></td></tr>
+      <% } %>
+      <% rows.forEach((row, i) => {
+           const prev = rows[i - 1];
+           const next = rows[i + 1];
+           const sameGroup = (o) => o && (!groupKey || o[groupKey] === row[groupKey]);
+      %>
+        <tr>
+          <% if (r.sortable) { %>
+            <td>
+              <div class="actions" style="justify-content:flex-start">
+                <form method="post" action="/admin/r/<%= resKey %>/<%= row.id %>/move" class="inline-form">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="dir" value="up">
+                  <button class="btn btn-outline btn-icon btn-sm" type="submit" title="ऊपर" <%= sameGroup(prev) ? '' : 'disabled' %>><%- icon('arrow-up') %></button>
+                </form>
+                <form method="post" action="/admin/r/<%= resKey %>/<%= row.id %>/move" class="inline-form">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="dir" value="down">
+                  <button class="btn btn-outline btn-icon btn-sm" type="submit" title="नीचे" <%= sameGroup(next) ? '' : 'disabled' %>><%- icon('arrow-down') %></button>
+                </form>
+              </div>
+            </td>
+          <% } %>
+          <% r.columns.forEach((c, ci) => { %>
+            <td>
+              <% if (c.type === 'image') { %>
+                <% if (row[c.key]) { %><img class="thumb" src="<%= row[c.key] %>" alt=""><% } else { %><span class="thumb"><%- icon('image') %></span><% } %>
+              <% } else if (ci === 1 || (ci === 0 && r.columns[0].type !== 'image')) { %>
+                <a class="cell-main" href="/admin/r/<%= resKey %>/<%= row.id %>/edit"><%= cell(c, row) %></a>
+              <% } else { %>
+                <%= cell(c, row) %>
+              <% } %>
+            </td>
+          <% }) %>
+          <td>
+            <div class="actions">
+              <a class="btn btn-outline btn-sm" href="/admin/r/<%= resKey %>/<%= row.id %>/edit"><%- icon('edit') %> संपादित</a>
+              <form method="post" action="/admin/r/<%= resKey %>/<%= row.id %>/delete" class="inline-form" data-confirm="क्या आप इसे स्थायी रूप से हटाना चाहते हैं?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="btn btn-danger btn-sm btn-icon" type="submit" title="हटाएँ"><%- icon('trash') %></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/admin-bottom') %>

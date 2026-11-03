@@ -1,0 +1,65 @@
+<%- include('../partials/admin-top') %>
+<% const KIND = { system: ['मुख्य अनुभाग', 'maroon'], block: ['डेटा अनुभाग', 'blue'], custom: ['कस्टम', 'gold'] }; %>
+
+<div class="card">
+  <div class="card-head">
+    <h2><%- icon('layout') %> मुखपृष्ठ के अनुभाग एवं पेज</h2>
+    <div class="actions"><a class="btn btn-primary btn-sm" href="/admin/sections/new"><%- icon('plus') %> नया अनुभाग / पेज</a></div>
+  </div>
+  <div class="card-body" style="padding-bottom:0">
+    <p class="hint" style="margin-top:0">↑ ↓ से मुखपृष्ठ पर अनुभागों का क्रम बदलें। <b>मुख्य</b> व <b>डेटा</b> अनुभाग हटाए नहीं जा सकते पर छिपाए जा सकते हैं। <b>कस्टम</b> अनुभाग से नया अनुभाग या अलग पेज (मेनू सहित) बनाएँ।</p>
+  </div>
+  <div class="card-body tight table-wrap">
+    <table class="table">
+      <thead><tr><th style="width:80px">क्रम</th><th>शीर्षक</th><th>प्रकार</th><th>स्थान</th><th>दृश्य</th><th></th></tr></thead>
+      <tbody>
+      <% sections.forEach((s, i) => { const k = KIND[s.kind] || [s.kind, 'gray']; %>
+        <tr>
+          <td>
+            <div class="actions" style="justify-content:flex-start">
+              <form method="post" action="/admin/sections/<%= s.id %>/move" class="inline-form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="dir" value="up">
+                <button class="btn btn-outline btn-icon btn-sm" type="submit" title="ऊपर" <%= i === 0 ? 'disabled' : '' %>><%- icon('arrow-up') %></button>
+              </form>
+              <form method="post" action="/admin/sections/<%= s.id %>/move" class="inline-form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="dir" value="down">
+                <button class="btn btn-outline btn-icon btn-sm" type="submit" title="नीचे" <%= i === sections.length - 1 ? 'disabled' : '' %>><%- icon('arrow-down') %></button>
+              </form>
+            </div>
+          </td>
+          <td>
+            <div class="cell-main"><a href="/admin/sections/<%= s.id %>/edit"><%= s.title %></a></div>
+            <div class="cell-sub mono">#<%= s.slug %></div>
+          </td>
+          <td><span class="badge <%= k[1] %>"><%= k[0] %></span></td>
+          <td class="small">
+            <%= s.show_on_home ? 'मुखपृष्ठ' : '' %><%= s.show_on_home && s.has_page ? ' + ' : '' %><%= s.has_page ? 'अलग पेज' : '' %>
+            <% if (s.has_page) { %><div class="cell-sub"><a href="/page/<%= s.slug %>" target="_blank" rel="noopener">/page/<%= s.slug %></a><%= s.show_in_nav ? ' · मेनू में' : '' %></div><% } %>
+          </td>
+          <td>
+            <form method="post" action="/admin/sections/<%= s.id %>/toggle" class="inline-form">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-sm <%= s.visible ? 'btn-outline' : 'btn-danger' %>" type="submit" title="दिखाएँ / छिपाएँ">
+                <%- icon(s.visible ? 'eye' : 'eye-off') %> <%= s.visible ? 'दृश्य' : 'छिपा' %>
+              </button>
+            </form>
+          </td>
+          <td>
+            <div class="actions">
+              <a class="btn btn-outline btn-sm" href="/admin/sections/<%= s.id %>/edit"><%- icon('edit') %> संपादित</a>
+              <% if (s.kind === 'custom') { %>
+                <form method="post" action="/admin/sections/<%= s.id %>/delete" class="inline-form" data-confirm="'<%= s.title %>' अनुभाग स्थायी रूप से हटाएँ?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-danger btn-sm btn-icon" type="submit" title="हटाएँ"><%- icon('trash') %></button>
+                </form>
+              <% } %>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/admin-bottom') %>

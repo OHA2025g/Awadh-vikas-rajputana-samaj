@@ -1,0 +1,295 @@
+<%- include('../partials/admin-top', { extraStyles: ['/css/certificate.css'], bodyClass: 'cert-page' }) %>
+<%
+  const certConfig = {
+    calibration,
+    defaults,
+    site: { org_name: site.org_name, city: site.city, reg_no: site.reg_no, established: site.established, logo: site.logo },
+    signatures,
+    nextSerial,
+    background,
+  };
+  const rng = (path, label, min, max, step, unit) => `
+    <div class="ctl">
+      <label for="c-${path}">${label} <small>${unit}</small></label>
+      <input type="range" id="c-${path}" data-path="${path}" min="${min}" max="${max}" step="${step}">
+      <input type="number" data-path="${path}" min="${min}" max="${max}" step="${step}" aria-label="${label}">
+    </div>`;
+%>
+<script type="application/json" id="cert-config"><%- JSON.stringify(certConfig).replace(/</g, '\\u003c') %></script>
+
+<div class="cert-layout">
+  <!-- Member selection -->
+  <section class="card cert-members">
+    <div class="card-head">
+      <h2><%- icon('users') %> सदस्य चुनें</h2>
+      <div class="actions"><span class="badge solid"><span id="sel-count">0</span> चयनित</span></div>
+    </div>
+    <div class="card-body pick-filters">
+      <input type="search" id="pick-q" placeholder="नाम, सदस्य क्रमांक या शहर से खोजें…" autocomplete="off">
+      <div class="grid cols-2">
+        <select id="pick-category">
+          <option value="">सभी श्रेणियाँ</option>
+          <% CATEGORIES.forEach((c) => { %><option value="<%= c.key %>"><%= c.label %></option><% }) %>
+        </select>
+        <select id="pick-mandal">
+          <option value="">सभी मंडल</option>
+          <% mandals.forEach((m) => { %><option value="<%= m.id %>"><%= m.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="seg" id="pick-cert" role="group" aria-label="प्रमाण पत्र की स्थिति">
+        <button type="button" class="active" data-cert=""><b id="cnt-all">–</b>सभी</button>
+        <button type="button" data-cert="unprinted"><b id="cnt-unprinted">–</b>नहीं छपे</button>
+        <button type="button" data-cert="printed"><b id="cnt-printed">–</b>छपे हुए</button>
+      </div>
+    </div>
+    <div class="pick-head">
+      <label class="check"><input type="checkbox" id="pick-all"> <span id="pick-all-label">सभी चुनें</span></label>
+      <span class="muted small" id="pick-info"></span>
+    </div>
+    <div class="pick-list" id="pick-list" aria-live="polite"></div>
+    <div class="pick-actions">
+      <button class="btn btn-outline btn-sm" type="button" id="pick-none" data-needs-selection disabled><%- icon('x') %> चयन हटाएँ</button>
+      <button class="btn btn-outline btn-sm" type="button" id="mark-printed" data-needs-selection disabled title="जिनका प्रमाण पत्र पहले ही (हाथ से या अन्य तरीके से) छप चुका है"><%- icon('check') %> "छपा" चिह्नित करें</button>
+      <button class="btn btn-outline btn-sm" type="button" id="mark-unprinted" data-needs-selection disabled title="गलत छपने पर दोबारा छापने हेतु"><%- icon('rotate-ccw') %> "नहीं छपा" करें</button>
+    </div>
+    <div class="sel-chips" id="sel-chips"></div>
+  </section>
+
+  <!-- Preview + print + calibration -->
+  <div class="cert-main">
+    <section class="card">
+      <div class="card-head">
+        <h2><%- icon('eye') %> पूर्वावलोकन</h2>
+        <span class="muted small" id="preview-who"></span>
+        <div class="actions">
+          <label class="switch" title="प्री-प्रिंटेड शीट पर केवल नाम और हस्ताक्षर छपेंगे">
+            <input type="checkbox" id="opt-preprint" checked>
+            <span class="slider"></span>
+            <span class="switch-label">प्री-प्रिंटेड पेपर मोड</span>
+          </label>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="mode-note" id="mode-note"></div>
+        <div class="preview-wrap" id="preview-wrap">
+          <div class="preview-box" id="preview-box"><div class="preview-scale" id="preview-scale"></div></div>
+        </div>
+        <p class="hint"><%- icon('move') %> नीली बिंदीदार बॉक्स को माउस से खींचकर नाम / दिनांक / हस्ताक्षर की स्थिति बदली जा सकती है। लाल रेखा वह आधार-रेखा है जिस पर अक्षर टिके रहते हैं। सूक्ष्म समायोजन नीचे स्लाइडर से करें।</p>
+      </div>
+      <div class="print-bar">
+        <div class="print-opts">
+          <label>हस्ताक्षर
+            <select id="opt-signature">
+              <option value="">— हस्ताक्षर न छापें —</option>
+              <% signatures.forEach((s) => { %><option value="<%= s.id %>"><%= s.label %><%= s.signer_name ? ' — ' + s.signer_name : '' %></option><% }) %>
+            </select>
+          </label>
+          <label id="date-opt">दिनांक <input type="date" id="opt-date"></label>
+        </div>
+        <div class="print-actions">
+          <button class="btn btn-outline" type="button" id="btn-grid" title="मिलीमीटर ग्रिड — किसी अतिरिक्त प्री-प्रिंटेड शीट पर छापकर हर रेखा की सही स्थिति पढ़ें"><%- icon('layout') %> ग्रिड प्रिंट</button>
+          <button class="btn btn-outline" type="button" id="btn-test" title="सादे कागज़ पर — नाम, दिनांक व हस्ताक्षर की स्थिति जाँचें"><%- icon('crosshair') %> परीक्षण प्रिंट</button>
+          <button class="btn btn-primary btn-lg" type="button" id="btn-print" disabled><%- icon('printer') %> <span id="print-label">प्रिंट करें</span></button>
+        </div>
+      </div>
+      <% if (!signatures.length) { %>
+        <div class="flash warn" style="margin:0 20px 20px"><%- icon('alert') %> <span>अभी कोई अधिकृत हस्ताक्षर नहीं जोड़ा गया है। <a href="/admin/signatures">अध्यक्ष / सचिव के हस्ताक्षर जोड़ें →</a></span></div>
+      <% } %>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2><%- icon('sliders') %> कैलिब्रेशन (मिलीमीटर में)</h2>
+        <span class="badge gold" id="dirty-badge" hidden>बिना सहेजे बदलाव</span>
+        <div class="actions">
+          <button class="btn btn-outline btn-sm" type="button" id="btn-reset" data-confirm-js="सभी कैलिब्रेशन मान डिफ़ॉल्ट पर लौटाएँ?"><%- icon('rotate-ccw') %> डिफ़ॉल्ट</button>
+          <button class="btn btn-green btn-sm" type="button" id="btn-save"><%- icon('save') %> सेटिंग सहेजें</button>
+        </div>
+      </div>
+      <div class="cal-tabs" role="tablist">
+        <button type="button" class="active" data-tab="tab-name"><%- icon('user') %> नाम</button>
+        <button type="button" data-tab="tab-sig"><%- icon('pen-tool') %> हस्ताक्षर</button>
+        <button type="button" data-tab="tab-offset"><%- icon('move') %> प्रिंटर ऑफ़सेट</button>
+        <button type="button" data-tab="tab-extra"><%- icon('calendar') %> दिनांक व क्रमांक</button>
+        <button type="button" data-tab="tab-design"><%- icon('layout') %> डिज़ाइन</button>
+      </div>
+      <div class="card-body">
+        <div class="cal-pane active" id="tab-name">
+          <p class="hint">"श्री. / श्रीमती. / कु." के आगे, दोनों रेखाओं के बीच सदस्य का नाम। सभी माप शीट के ऊपरी-बाएँ कोने से मिलीमीटर में हैं — <b>X</b> नाम-बॉक्स का बायाँ किनारा और <b>Y</b> वह आधार-रेखा है जिस पर अक्षर टिके रहते हैं (मात्राएँ इसके ऊपर-नीचे जाती हैं)।</p>
+          <div class="ctl-grid">
+            <%- rng('name.x', 'X — बाएँ से', 0, 297, 0.1, 'mm') %>
+            <%- rng('name.y', 'Y — आधार-रेखा, ऊपर से', 0, 210, 0.1, 'mm') %>
+            <%- rng('name.width', 'बॉक्स चौड़ाई', 30, 297, 0.5, 'mm') %>
+            <%- rng('name.fontSize', 'फ़ॉन्ट आकार', 8, 72, 0.5, 'pt') %>
+          </div>
+          <div class="grid cols-4 ctl-extras">
+            <div class="field">
+              <label for="c-font">फ़ॉन्ट</label>
+              <select id="c-font" data-path="name.font">
+                <option value="Tiro Devanagari Hindi">Tiro Devanagari (पारंपरिक)</option>
+                <option value="Noto Serif Devanagari">Noto Serif (सेरिफ़)</option>
+                <option value="Rozha One">Rozha One (शीर्षक शैली)</option>
+                <option value="Kalam">Kalam (हस्तलिखित)</option>
+                <option value="Mukta">Mukta (आधुनिक)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="c-weight">मोटाई</label>
+              <select id="c-weight" data-path="name.weight">
+                <option value="400">सामान्य</option>
+                <option value="500">मध्यम</option>
+                <option value="700">बोल्ड</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="c-align">संरेखण</label>
+              <select id="c-align" data-path="name.align">
+                <option value="left">बाएँ</option>
+                <option value="center">मध्य</option>
+                <option value="right">दाएँ</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="c-color">स्याही रंग</label>
+              <input type="color" id="c-color" data-path="name.color">
+            </div>
+          </div>
+          <label class="check"><input type="checkbox" data-path="name.salutation"> नाम से पहले संबोधन (श्री / श्रीमती / कु.) भी छापें — <span class="muted small">यदि शीट पर पहले से छपा है तो बंद रखें</span></label>
+          <p class="hint">लंबे नाम बॉक्स की चौड़ाई में स्वतः छोटे फ़ॉन्ट में फ़िट हो जाते हैं।</p>
+        </div>
+
+        <div class="cal-pane" id="tab-sig">
+          <p class="hint">"अध्यक्ष / सचिव" के ऊपर वाली रेखा पर अधिकृत हस्ताक्षर। <b>Y</b> हस्ताक्षर-बॉक्स का निचला किनारा है — इसे शीट की हस्ताक्षर-रेखा पर रखें। हस्ताक्षर की खाली जगह स्वतः काट दी जाती है, ताकि स्याही ठीक रेखा पर बैठे।</p>
+          <div class="ctl-grid">
+            <%- rng('signature.x', 'X — बाएँ से', 0, 297, 0.1, 'mm') %>
+            <%- rng('signature.y', 'Y — निचला किनारा (रेखा), ऊपर से', 0, 210, 0.1, 'mm') %>
+            <%- rng('signature.width', 'चौड़ाई', 10, 120, 0.5, 'mm') %>
+            <%- rng('signature.height', 'ऊँचाई', 5, 60, 0.5, 'mm') %>
+          </div>
+          <p class="hint"><a href="/admin/signatures"><%- icon('pen-tool') %> हस्ताक्षर जोड़ें / बदलें</a></p>
+        </div>
+
+        <div class="cal-pane" id="tab-offset">
+          <p class="hint">यदि आपका प्रिंटर पूरे प्रिंट को थोड़ा खिसकाकर छापता है, तो यहाँ सुधारें — यह सभी छपने वाले फ़ील्ड पर एक साथ लागू होता है। <b>परीक्षण प्रिंट</b> को सादे कागज़ पर छापकर, उसे प्री-प्रिंटेड शीट के साथ रोशनी के सामने मिलाएँ और अंतर मिलीमीटर में मापें।</p>
+          <div class="ctl-grid">
+            <%- rng('offsetX', 'बाएँ (−) / दाएँ (+)', -30, 30, 0.5, 'mm') %>
+            <%- rng('offsetY', 'ऊपर (−) / नीचे (+)', -30, 30, 0.5, 'mm') %>
+          </div>
+          <div class="nudge">
+            <span class="muted small">त्वरित समायोजन:</span>
+            <button type="button" class="btn btn-outline btn-sm" data-nudge="offsetY:-0.5"><%- icon('arrow-up') %></button>
+            <button type="button" class="btn btn-outline btn-sm" data-nudge="offsetY:0.5"><%- icon('arrow-down') %></button>
+            <button type="button" class="btn btn-outline btn-sm" data-nudge="offsetX:-0.5"><%- icon('chevron-left') %></button>
+            <button type="button" class="btn btn-outline btn-sm" data-nudge="offsetX:0.5"><%- icon('chevron-right') %></button>
+          </div>
+        </div>
+
+        <div class="cal-pane" id="tab-extra">
+          <p class="hint">दिनांक शीट पर "दिनांक :" के ठीक आगे छपता है (प्रिंट के समय नीचे चुना गया दिनांक)। <b>X</b> दिनांक का बायाँ किनारा, <b>Y</b> उसकी आधार-रेखा है।</p>
+          <div class="grid cols-2">
+            <div>
+              <label class="check"><input type="checkbox" data-path="date.enabled"> <b>दिनांक छापें</b></label>
+              <div class="ctl-grid one">
+                <%- rng('date.x', 'X — बाएँ से', 0, 297, 0.1, 'mm') %>
+                <%- rng('date.y', 'Y — आधार-रेखा, ऊपर से', 0, 210, 0.1, 'mm') %>
+                <%- rng('date.fontSize', 'फ़ॉन्ट', 8, 36, 0.5, 'pt') %>
+              </div>
+              <label class="check"><input type="checkbox" data-path="date.hindiDigits"> अंक देवनागरी में छापें (०२/११/२०२६)</label>
+            </div>
+            <div>
+              <label class="check"><input type="checkbox" data-path="serial.enabled"> <b>क्रम संख्या छापें</b></label>
+              <p class="hint">आपकी शीट पर क्रम संख्या पहले से छपी है, इसलिए यह सामान्यतः बंद रखें।</p>
+              <div class="ctl-grid one">
+                <%- rng('serial.x', 'X — बाएँ से', 0, 297, 0.1, 'mm') %>
+                <%- rng('serial.y', 'Y — आधार-रेखा, ऊपर से', 0, 210, 0.1, 'mm') %>
+                <%- rng('serial.fontSize', 'फ़ॉन्ट', 8, 36, 0.5, 'pt') %>
+              </div>
+              <div class="grid cols-2">
+                <div class="field">
+                  <label for="c-prefix">उपसर्ग</label>
+                  <input type="text" id="c-prefix" data-path="serial.prefix" maxlength="12" placeholder="जैसे: ARVS/">
+                </div>
+                <div class="field">
+                  <label for="next-serial">अगला क्रमांक</label>
+                  <div class="toolbar">
+                    <input type="number" id="next-serial" min="1" style="max-width:110px">
+                    <button type="button" class="btn btn-outline btn-sm" id="btn-serial">सेट करें</button>
+                  </div>
+                </div>
+              </div>
+              <p class="hint">क्रमांक पहली बार प्रिंट करते समय सदस्य को स्थायी रूप से दिया जाता है; दोबारा प्रिंट करने पर वही क्रमांक छपता है।</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="cal-pane" id="tab-design">
+          <p class="hint">अंतर्निहित डिज़ाइन आपकी प्री-प्रिंटेड शीट की प्रतिकृति है (वही स्थान व पाठ)। ये पाठ केवल <b>पूर्ण डिज़ाइन मोड</b> (प्री-प्रिंटेड पेपर मोड बंद) में सादे कागज़ पर पूरा प्रमाण पत्र छापने के लिए हैं। <code>{org_name}</code> और <code>{city}</code> स्वतः भर जाते हैं, <code>**शब्द**</code> बोल्ड छपता है और हर नई पंक्ति शीट पर नई पंक्ति बनती है।</p>
+          <div class="grid cols-2">
+            <div class="field">
+              <label for="d-reg">पंजीयन पंक्ति</label>
+              <input type="text" id="d-reg" data-path="design.reg_line" maxlength="120">
+            </div>
+            <div class="field">
+              <label for="d-trust">ट्रस्ट पंजीयन पंक्ति</label>
+              <input type="text" id="d-trust" data-path="design.trust_line" maxlength="120">
+            </div>
+            <div class="field">
+              <label for="d-address">पता</label>
+              <input type="text" id="d-address" data-path="design.address" maxlength="160">
+            </div>
+            <div class="field">
+              <label for="d-ribbon">रिबन पाठ</label>
+              <input type="text" id="d-ribbon" data-path="design.ribbon" maxlength="60">
+            </div>
+            <div class="field span-all">
+              <label for="d-body">मुख्य पाठ (3 पंक्तियाँ)</label>
+              <textarea id="d-body" data-path="design.body" maxlength="600" rows="3"></textarea>
+            </div>
+            <div class="field">
+              <label for="d-dt">बाएँ पट्टे का शीर्षक</label>
+              <input type="text" id="d-dt" data-path="design.duties_title" maxlength="40">
+            </div>
+            <div class="field">
+              <label for="d-dh">बाएँ पट्टे की उप-पंक्ति</label>
+              <input type="text" id="d-dh" data-path="design.duties_head" maxlength="60">
+            </div>
+            <div class="field span-all">
+              <label for="d-duties">बाएँ पट्टे की सूची (हर पंक्ति अलग)</label>
+              <textarea id="d-duties" data-path="design.duties" maxlength="600" rows="6"></textarea>
+            </div>
+          </div>
+          <hr class="sep">
+          <h3 class="small-h"><%- icon('image') %> प्री-प्रिंटेड शीट का स्कैन (वैकल्पिक)</h3>
+          <p class="hint">अपनी खाली प्री-प्रिंटेड शीट को स्कैन करके (A4 लैंडस्केप, पूरा पेज) अपलोड करें। पूर्वावलोकन में वही शीट दिखेगी, जिससे स्थिति मिलाना आसान होगा। प्री-प्रिंटेड मोड में यह कभी नहीं छपती।</p>
+          <div class="toolbar">
+            <label class="check"><input type="radio" name="design-src" value="builtin" checked> अंतर्निहित डिज़ाइन</label>
+            <label class="check"><input type="radio" name="design-src" value="scan" id="src-scan"> स्कैन की गई शीट</label>
+            <label class="btn btn-outline btn-sm"><%- icon('upload') %> स्कैन अपलोड करें<input type="file" id="bg-file" accept="image/jpeg,image/png,image/webp" hidden></label>
+            <button type="button" class="btn btn-danger btn-sm" id="bg-remove" hidden><%- icon('trash') %> स्कैन हटाएँ</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card tips">
+      <div class="card-body">
+        <h3 class="small-h"><%- icon('info') %> सही प्रिंट के लिए ब्राउज़र प्रिंट सेटिंग</h3>
+        <ul>
+          <li><b>Paper size:</b> A4 &nbsp;•&nbsp; <b>Layout:</b> Landscape (स्वतः)</li>
+          <li><b>Margins:</b> None (कोई नहीं) &nbsp;•&nbsp; <b>Scale:</b> 100% / Default (कभी "Fit to page" न चुनें)</li>
+          <li><b>Headers and footers:</b> बंद &nbsp;•&nbsp; पूर्ण डिज़ाइन मोड में <b>Background graphics</b> चालू रखें</li>
+          <li>प्री-प्रिंटेड शीट को प्रिंटर ट्रे में सही दिशा में रखें — पहले एक सादे कागज़ पर परीक्षण अवश्य करें।</li>
+        </ul>
+        <h3 class="small-h"><%- icon('crosshair') %> पहली बार स्थिति मिलाने का तरीका</h3>
+        <ul>
+          <li><b>1.</b> "परीक्षण प्रिंट" सादे कागज़ पर छापें, उसे प्री-प्रिंटेड शीट के ऊपर रखकर रोशनी के सामने देखें। नाम दोनों रेखाओं के बीच, दिनांक "दिनांक :" के आगे और हस्ताक्षर "अध्यक्ष / सचिव" वाली रेखा पर होना चाहिए।</li>
+          <li><b>2.</b> यदि सब कुछ एक ही दिशा में खिसका है तो केवल <b>प्रिंटर ऑफ़सेट</b> बदलें। यदि कोई एक फ़ील्ड गलत है तो उसी का X/Y बदलें।</li>
+          <li><b>3.</b> सबसे सटीक तरीका: "ग्रिड प्रिंट" को किसी खराब / अतिरिक्त प्री-प्रिंटेड शीट पर छापें — ग्रिड पर सीधे पढ़ें कि नाम की रेखाएँ, "दिनांक :" और हस्ताक्षर-रेखा कितने मिलीमीटर पर हैं, और वही मान यहाँ भरें।</li>
+          <li><b>4.</b> "सेटिंग सहेजें" दबाएँ — फिर सभी सदस्यों के प्रमाण पत्र उसी स्थिति पर छपेंगे।</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+
+<%- include('../partials/admin-bottom', { scripts: ['/js/certificate.js'] }) %>

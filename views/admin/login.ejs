@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>एडमिन लॉगिन | <%= site.org_name %></title>
+  <link rel="icon" href="<%= site.logo %>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="login-page">
+    <form class="login-card stack" method="post" action="/admin/login">
+      <div>
+        <img class="logo" src="<%= site.logo %>" alt="">
+        <h1><%= site.org_name %></h1>
+        <p class="sub">प्रशासन पैनल में लॉगिन करें</p>
+      </div>
+      <% if (error) { %>
+        <div class="flash error" style="margin:0"><%- icon('alert') %> <span><%= error %></span></div>
+      <% } %>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="next" value="<%= next %>">
+      <div class="field">
+        <label for="username">उपयोगकर्ता नाम</label>
+        <input type="text" id="username" name="username" value="<%= username %>" autocomplete="username" required autofocus>
+      </div>
+      <div class="field">
+        <label for="password">पासवर्ड</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-primary btn-lg btn-block" type="submit"><%- icon('log-in') %> लॉगिन</button>
+      <p class="muted small" style="text-align:center;margin:0"><a href="/"><%- icon('chevron-left') %> वेबसाइट पर वापस जाएँ</a></p>
+    </form>
+  </div>
+</body>
+</html>

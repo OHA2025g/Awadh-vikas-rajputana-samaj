@@ -1,0 +1,145 @@
+<%- include('../partials/admin-top') %>
+<%
+  const withParams = (changes) => {
+    const p = new URLSearchParams(qs);
+    p.delete('page');
+    for (const [k, v] of Object.entries(changes)) { if (v) p.set(k, v); else p.delete(k); }
+    const s = p.toString();
+    return '/admin/meetings' + (s ? '?' + s : '');
+  };
+  const pageUrl = (n) => '/admin/meetings?' + (qs ? qs + '&' : '') + 'page=' + n;
+  const fileUrl = (f) => '/admin/meetings/files/' + f.id;
+  const when = (m) => formatDate(m.meeting_date) + (m.meeting_time ? ' • ' + m.meeting_time : '');
+  const hasFilters = filters.q || filters.committee || filters.year;
+%>
+
+<div class="card">
+  <div class="card-head">
+    <form class="toolbar" method="get" action="/admin/meetings">
+      <% if (filters.view === 'list') { %><input type="hidden" name="view" value="list"><% } %>
+      <input type="search" name="q" value="<%= filters.q %>" placeholder="शीर्षक, स्थान, उपस्थित, कार्यवाही में खोजें…">
+      <select name="committee" data-autosubmit aria-label="समिति">
+        <option value="">सभी समितियाँ</option>
+        <% committees.forEach((c) => { %><option value="<%= c.id %>" <%= filters.committee === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+      </select>
+      <select name="year" data-autosubmit aria-label="वर्ष">
+        <option value="">सभी वर्ष</option>
+        <% years.forEach((y) => { %><option value="<%= y %>" <%= filters.year === y ? 'selected' : '' %>><%= y %></option><% }) %>
+      </select>
+      <button class="btn btn-outline" type="submit"><%- icon('search') %> खोजें</button>
+      <% if (hasFilters) { %><a class="btn btn-outline" href="<%= filters.view === 'list' ? '/admin/meetings?view=list' : '/admin/meetings' %>"><%- icon('x') %> साफ़ करें</a><% } %>
+    </form>
+    <div class="actions">
+      <div class="view-toggle" role="group" aria-label="दृश्य">
+        <a class="<%= filters.view === 'gallery' ? 'active' : '' %>" href="<%= withParams({ view: '' }) %>" title="गैलरी"><%- icon('grid') %> गैलरी</a>
+        <a class="<%= filters.view === 'list' ? 'active' : '' %>" href="<%= withParams({ view: 'list' }) %>" title="सूची"><%- icon('list') %> सूची</a>
+      </div>
+      <a class="btn btn-primary btn-sm" href="/admin/meetings/new"><%- icon('plus') %> नई बैठक</a>
+    </div>
+  </div>
+  <div class="card-body bulk-bar">
+    <span class="muted small"><%- icon('lock') %> यह अनुभाग केवल एडमिन के लिए है — वेबसाइट पर प्रकाशित नहीं होता।</span>
+    <span class="muted small" style="margin-left:auto">कुल <b><%= pg.total %></b> बैठकें</span>
+  </div>
+
+  <% if (!rows.length) { %>
+    <div class="empty-state">
+      <%- icon('file-text') %>
+      <p><%= hasFilters ? 'इस खोज में कोई बैठक नहीं मिली।' : 'अभी तक कोई बैठक दर्ज नहीं की गई है।' %></p>
+      <a class="btn btn-primary btn-sm" href="/admin/meetings/new"><%- icon('plus') %> पहली बैठक दर्ज करें</a>
+    </div>
+  <% } else if (filters.view === 'gallery') { %>
+    <div class="card-body mt-grid">
+      <% rows.forEach((m) => { const images = m.files.filter((f) => f.kind === 'image'); const group = 'm' + m.id; %>
+        <article class="mt-card">
+          <% if (images.length) { %>
+            <a class="mt-cover" href="<%= fileUrl(images[0]) %>" data-lightbox="<%= group %>" data-caption="<%= m.title %> — <%= images[0].original_name || '' %>">
+              <img src="<%= fileUrl(images[0]) %>" alt="<%= m.title %>" loading="lazy">
+              <span class="mt-count"><%- icon('image') %> <%= images.length %></span>
+            </a>
+          <% } else { %>
+            <a class="mt-cover mt-cover-empty" href="/admin/meetings/<%= m.id %>">
+              <%- icon(m.file_count ? 'file-text' : 'book-open') %>
+              <span><%= m.file_count ? m.file_count + ' PDF संलग्न' : 'कोई स्कैन संलग्न नहीं' %></span>
+            </a>
+          <% } %>
+          <% m.files.forEach((f) => { if (f.kind === 'image' && f.id !== images[0]?.id) { %>
+            <a href="<%= fileUrl(f) %>" data-lightbox="<%= group %>" data-caption="<%= m.title %> — <%= f.original_name || '' %>" hidden></a>
+          <% } else if (f.kind === 'pdf') { %>
+            <a href="<%= fileUrl(f) %>" data-lightbox="<%= group %>" data-kind="pdf" data-caption="<%= f.original_name || 'PDF' %>" hidden></a>
+          <% } }) %>
+          <div class="mt-body">
+            <div class="mt-date"><%- icon('calendar') %> <%= when(m) %></div>
+            <h3><a href="/admin/meetings/<%= m.id %>"><%= m.title %></a></h3>
+            <% if (m.venue) { %><div class="muted small mt-venue"><%- icon('map-pin') %> <%= m.venue %></div><% } %>
+            <div class="mt-meta">
+              <% if (m.committee_name) { %><span class="badge gold"><%= m.committee_name %></span><% } %>
+              <span class="muted small"><%- icon('users') %> <%= m.attendeeCount %> उपस्थित</span>
+              <% if (m.file_count) { %><span class="muted small"><%- icon('paperclip') %> <%= m.file_count %> <%= m.file_count === 1 ? 'फ़ाइल' : 'फ़ाइलें' %></span><% } %>
+            </div>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>दिनांक</th>
+            <th>बैठक</th>
+            <th>समिति</th>
+            <th>उपस्थित</th>
+            <th>संलग्न स्कैन</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach((m) => { const group = 'l' + m.id; %>
+            <tr>
+              <td class="nowrap"><b><%= formatDate(m.meeting_date, 'short') %></b><div class="cell-sub"><%= m.meeting_time || '' %></div></td>
+              <td>
+                <div class="cell-main"><a href="/admin/meetings/<%= m.id %>"><%= m.title %></a></div>
+                <div class="cell-sub"><%= m.venue || '' %></div>
+              </td>
+              <td><%= m.committee_name || '—' %></td>
+              <td class="nowrap"><%= m.attendeeCount %></td>
+              <td>
+                <div class="mt-strip">
+                  <% m.files.forEach((f, i) => { %>
+                    <% if (f.kind === 'image') { %>
+                      <a href="<%= fileUrl(f) %>" data-lightbox="<%= group %>" data-caption="<%= m.title %> — <%= f.original_name || '' %>" <%= i >= 4 ? 'hidden' : '' %>><img src="<%= fileUrl(f) %>" alt="" loading="lazy"></a>
+                    <% } else { %>
+                      <a class="mt-pdf-mini" href="<%= fileUrl(f) %>" data-lightbox="<%= group %>" data-kind="pdf" data-caption="<%= f.original_name || 'PDF' %>" <%= i >= 4 ? 'hidden' : '' %>>PDF</a>
+                    <% } %>
+                  <% }) %>
+                  <% if (m.files.length > 4) { %><span class="muted small">+<%= m.files.length - 4 %></span><% } %>
+                  <% if (!m.files.length) { %><span class="muted">—</span><% } %>
+                </div>
+              </td>
+              <td>
+                <div class="actions">
+                  <a class="btn btn-outline btn-sm btn-icon" href="/admin/meetings/<%= m.id %>" title="देखें"><%- icon('eye') %></a>
+                  <a class="btn btn-outline btn-sm btn-icon" href="/admin/meetings/<%= m.id %>/edit" title="संपादित करें"><%- icon('edit') %></a>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <% if (pg.pages > 1) { %>
+    <nav class="pager">
+      <% if (pg.page > 1) { %><a href="<%= pageUrl(pg.page - 1) %>"><%- icon('chevron-left') %></a><% } %>
+      <% for (let i = Math.max(1, pg.page - 3); i <= Math.min(pg.pages, pg.page + 3); i++) { %>
+        <% if (i === pg.page) { %><span class="current"><%= i %></span><% } else { %><a href="<%= pageUrl(i) %>"><%= i %></a><% } %>
+      <% } %>
+      <% if (pg.page < pg.pages) { %><a href="<%= pageUrl(pg.page + 1) %>"><%- icon('chevron-right') %></a><% } %>
+    </nav>
+  <% } %>
+</div>
+
+<%- include('../partials/lightbox') %>
+<%- include('../partials/admin-bottom', { scripts: ['/js/admin-records.js'] }) %>

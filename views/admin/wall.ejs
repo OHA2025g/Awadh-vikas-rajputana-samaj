@@ -1,0 +1,127 @@
+<%- include('../partials/admin-top') %>
+<%
+  const catBadge = { announcement: 'maroon', event: 'blue', achievement: 'gold', general: 'gray' };
+  const postForm = (p) => `
+    <div class="card-body grid cols-2">
+      <div class="field">
+        <label>श्रेणी</label>
+        <select name="category">${POST_CATEGORIES.map((c) => `<option value="${c.key}" ${p.category === c.key ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
+      </div>
+      <div class="field">
+        <label>लेखक का नाम</label>
+        <input type="text" name="author_name" maxlength="80" value="${esc(p.author_name)}" placeholder="संघ कार्यालय">
+      </div>
+      <div class="field span-all">
+        <label>शीर्षक</label>
+        <input type="text" name="title" maxlength="150" value="${esc(p.title)}">
+      </div>
+      <div class="field span-all">
+        <label>विवरण <span class="req">*</span></label>
+        <textarea name="body" rows="5" maxlength="5000" required>${esc(p.body)}</textarea>
+      </div>
+      <div class="field">
+        <label>चित्र</label>
+        ${p.image ? `<img src="${esc(p.image)}" alt="" style="max-height:120px;border-radius:10px;display:block;margin-bottom:6px"><label class="check small"><input type="checkbox" name="remove_image" value="1"> चित्र हटाएँ</label>` : ''}
+        <input type="file" name="image" accept="image/jpeg,image/png,image/webp">
+      </div>
+      <label class="check"><input type="checkbox" name="pinned" value="1" ${p.pinned ? 'checked' : ''}> ऊपर पिन करें</label>
+    </div>`;
+  function esc(v) { return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+%>
+
+<% if (editing) { %>
+  <p><a href="/admin/wall?status=<%= editing.status %>"><%- icon('chevron-left') %> सामुदायिक मंच</a></p>
+  <form class="card" method="post" action="/admin/wall/<%= editing.id %>" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="card-head"><h2><%- icon('edit') %> पोस्ट संपादन</h2></div>
+    <%- postForm(editing) %>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit"><%- icon('save') %> सहेजें</button>
+      <a class="btn btn-outline" href="/admin/wall?status=<%= editing.status %>">रद्द करें</a>
+    </div>
+  </form>
+<% } else { %>
+
+<div class="grid cols-3">
+  <div class="span-2">
+    <div class="tabs" style="margin-bottom:16px">
+      <a href="/admin/wall" class="<%= status === 'published' ? 'active' : '' %>"><%- icon('check') %> प्रकाशित</a>
+      <a href="/admin/wall?status=pending" class="<%= status === 'pending' ? 'active' : '' %>"><%- icon('clock') %> स्वीकृति हेतु <% if (badges.wall) { %><span class="badge solid"><%= badges.wall %></span><% } %></a>
+      <a href="/admin/wall?status=rejected" class="<%= status === 'rejected' ? 'active' : '' %>"><%- icon('x') %> अस्वीकृत</a>
+    </div>
+
+    <% if (!posts.length) { %>
+      <div class="card"><div class="empty-state"><%- icon('message-circle') %><p>इस सूची में कोई पोस्ट नहीं है।</p></div></div>
+    <% } %>
+    <% posts.forEach((p) => { %>
+      <article class="card">
+        <div class="card-head">
+          <span class="badge <%= catBadge[p.category] %>"><%= POST_CATEGORY_LABEL[p.category] %></span>
+          <% if (p.pinned) { %><span class="badge solid"><%- icon('bookmark') %> पिन</span><% } %>
+          <span class="muted small"><b><%= p.author_name || '—' %></b><%= p.member_no ? ' (' + p.member_no + ')' : '' %> · <%= relativeTime(p.created_at) %> · <%- icon('thumbs-up') %> <%= p.likes %> · <%- icon('message-circle') %> <%= p.comment_count %></span>
+          <div class="actions">
+            <% if (p.status === 'pending') { %>
+              <form method="post" action="/admin/wall/<%= p.id %>/approve" class="inline-form"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-green btn-sm" type="submit"><%- icon('check') %> प्रकाशित करें</button></form>
+              <form method="post" action="/admin/wall/<%= p.id %>/reject" class="inline-form"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-outline btn-sm" type="submit"><%- icon('x') %> अस्वीकार</button></form>
+            <% } else if (p.status === 'published') { %>
+              <form method="post" action="/admin/wall/<%= p.id %>/pin" class="inline-form"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-outline btn-sm btn-icon" type="submit" title="<%= p.pinned ? 'पिन हटाएँ' : 'पिन करें' %>"><%- icon('bookmark') %></button></form>
+            <% } else { %>
+              <form method="post" action="/admin/wall/<%= p.id %>/approve" class="inline-form"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-outline btn-sm" type="submit">पुनः प्रकाशित</button></form>
+            <% } %>
+            <a class="btn btn-outline btn-sm btn-icon" href="/admin/wall/<%= p.id %>/edit" title="संपादित करें"><%- icon('edit') %></a>
+            <form method="post" action="/admin/wall/<%= p.id %>/delete" class="inline-form" data-confirm="यह पोस्ट स्थायी रूप से हटाएँ?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-danger btn-sm btn-icon" type="submit" title="हटाएँ"><%- icon('trash') %></button></form>
+          </div>
+        </div>
+        <div class="card-body wall-post">
+          <% if (p.image) { %><img src="<%= p.image %>" alt=""><% } %>
+          <div>
+            <% if (p.title) { %><h3><%= p.title %></h3><% } %>
+            <p><%= p.body %></p>
+          </div>
+        </div>
+      </article>
+    <% }) %>
+
+    <% if (pg && pg.pages > 1) { %>
+      <nav class="pager">
+        <% for (let i = 1; i <= pg.pages; i++) { %>
+          <% if (i === pg.page) { %><span class="current"><%= i %></span><% } else { %><a href="/admin/wall?status=<%= status %>&page=<%= i %>"><%= i %></a><% } %>
+        <% } %>
+      </nav>
+    <% } %>
+  </div>
+
+  <div>
+    <form class="card" method="post" action="/admin/wall" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="card-head"><h2><%- icon('plus') %> नई पोस्ट / घोषणा</h2></div>
+      <%- postForm({ category: 'announcement', pinned: 0 }) %>
+      <div class="form-actions"><button class="btn btn-primary btn-block" type="submit"><%- icon('send') %> प्रकाशित करें</button></div>
+    </form>
+
+    <section class="card">
+      <div class="card-head"><h2><%- icon('message-circle') %> हाल की टिप्पणियाँ</h2></div>
+      <div class="card-body tight">
+        <% if (!comments.length) { %>
+          <div class="empty-state"><p>कोई टिप्पणी नहीं।</p></div>
+        <% } %>
+        <% comments.forEach((c) => { %>
+          <div class="comment-row">
+            <div>
+              <b><%= c.name %></b> <span class="muted small">· <%= relativeTime(c.created_at) %></span>
+              <div class="small"><%= c.body %></div>
+              <div class="cell-sub">पर: <%= c.post_title || String(c.post_body || '').slice(0, 40) %></div>
+            </div>
+            <form method="post" action="/admin/wall/comments/<%= c.id %>/delete" class="inline-form" data-confirm="यह टिप्पणी हटाएँ?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-danger btn-sm btn-icon" type="submit" title="हटाएँ"><%- icon('trash') %></button>
+            </form>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+  </div>
+</div>
+<% } %>
+
+<%- include('../partials/admin-bottom') %>

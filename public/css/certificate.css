@@ -1,0 +1,759 @@
+/* ================= Printer page layout ================= */
+
+.cert-layout {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+@media (max-width: 1280px) {
+  .cert-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cert-members {
+  position: sticky;
+  top: 78px;
+}
+
+@media (max-width: 1280px) {
+  .cert-members {
+    position: static;
+  }
+}
+
+.pick-filters {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.pick-list {
+  max-height: min(56vh, 560px);
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+}
+
+.pick {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.pick:hover {
+  background: #fffaf3;
+}
+
+.pick.previewing {
+  background: var(--saffron-50);
+  box-shadow: inset 3px 0 0 var(--saffron);
+}
+
+.pick input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--saffron);
+  flex-shrink: 0;
+}
+
+.pick-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.pick-main b {
+  display: block;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pick-meta {
+  font-size: 12.5px;
+  color: var(--muted);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pick .btn-icon {
+  flex-shrink: 0;
+}
+
+.pstat {
+  flex-shrink: 0;
+  display: inline-grid;
+  justify-items: center;
+  gap: 0;
+  min-width: 74px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.pstat svg {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+}
+
+.pstat small {
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.pstat.yes {
+  background: #e3f5e8;
+  color: #17663a;
+}
+
+.pstat.no {
+  background: #fff1e0;
+  color: #a4510b;
+}
+
+.seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.seg button {
+  border: 0;
+  background: #fff;
+  padding: 7px 4px;
+  font: 600 13.5px var(--font);
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  gap: 1px;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--line);
+}
+
+.seg button b {
+  font-size: 15px;
+  color: var(--ink, #2a1a10);
+}
+
+.seg button.active {
+  background: var(--saffron-50);
+  color: var(--maroon);
+  box-shadow: inset 0 -3px 0 var(--saffron);
+}
+
+.pick-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  background: #fcfaf7;
+  font-size: 14px;
+}
+
+.pick-head .check {
+  font-weight: 700;
+}
+
+.pick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.pick-empty {
+  padding: 30px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.sel-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.sel-chips:empty {
+  display: none;
+}
+
+.sel-chips button {
+  border: 0;
+  background: var(--maroon);
+  color: #fff;
+  border-radius: 999px;
+  padding: 3px 6px 3px 11px;
+  font: 500 13px var(--font);
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.sel-chips button:hover {
+  background: var(--red);
+}
+
+/* Preview */
+
+.preview-wrap {
+  background: #ddd4c7 linear-gradient(45deg, rgba(255, 255, 255, 0.18) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.18) 75%) 0 0 / 22px 22px;
+  border-radius: 12px;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.preview-box {
+  position: relative;
+  margin: 0 auto;
+}
+
+.preview-scale {
+  transform-origin: 0 0;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.preview-scale .sheet {
+  box-shadow: 0 10px 40px -8px rgba(40, 20, 0, 0.45);
+}
+
+.mode-note {
+  margin-bottom: 12px;
+  font-size: 14.5px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: var(--blue-50);
+  color: var(--blue);
+}
+
+.mode-note.full {
+  background: var(--saffron-50);
+  color: var(--maroon);
+}
+
+.print-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid var(--line);
+  background: #fcfaf7;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.print-opts {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.print-opts label {
+  display: grid;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.print-opts select {
+  min-width: 240px;
+}
+
+.print-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Switch */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
+.switch input {
+  display: none;
+}
+
+.switch .slider {
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  background: #d5ccc0;
+  position: relative;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.switch .slider::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease;
+}
+
+.switch input:checked + .slider {
+  background: var(--green);
+}
+
+.switch input:checked + .slider::after {
+  transform: translateX(20px);
+}
+
+/* Calibration controls */
+
+.cal-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.cal-tabs button {
+  border: 0;
+  background: none;
+  padding: 10px 14px;
+  font: 600 14.5px var(--font);
+  color: var(--muted);
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.cal-tabs button.active {
+  color: var(--maroon);
+  border-bottom-color: var(--saffron);
+}
+
+.cal-pane {
+  display: none;
+}
+
+.cal-pane.active {
+  display: block;
+}
+
+.ctl-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 26px;
+  margin: 12px 0 16px;
+}
+
+.ctl-grid.one {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 700px) {
+  .ctl-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ctl {
+  display: grid;
+  grid-template-columns: 1fr 86px;
+  gap: 2px 12px;
+  align-items: center;
+}
+
+.ctl label {
+  grid-column: 1 / -1;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.ctl label small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.ctl input[type='range'] {
+  width: 100%;
+  accent-color: var(--saffron);
+}
+
+.ctl input[type='number'] {
+  padding: 5px 8px;
+  text-align: right;
+}
+
+.ctl-extras {
+  margin-bottom: 12px;
+}
+
+.nudge {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.small-h {
+  font-size: 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+hr.sep {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 18px 0;
+}
+
+.tips ul {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+.tips li {
+  margin-bottom: 4px;
+}
+
+/* ================= The A4 sheet (physical units) ================= */
+
+.sheet {
+  width: 297mm;
+  height: 210mm;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.sheet .f {
+  position: absolute;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.sheet .f-sig {
+  object-fit: contain;
+  object-position: center bottom;
+  mix-blend-mode: multiply;
+}
+
+.sheet .f-sig.empty {
+  border: 0.3mm dashed #9aa5c8;
+}
+
+.preview-scale .sheet .f {
+  outline: 0.35mm dashed rgba(29, 78, 216, 0.75);
+  outline-offset: 0;
+  cursor: move;
+  touch-action: none;
+}
+
+.preview-scale .sheet .f:hover,
+.preview-scale .sheet .f.dragging {
+  outline-color: #e11d48;
+  background: rgba(225, 29, 72, 0.05);
+}
+
+.sheet.preprint .cert-design,
+.sheet.preprint .cd-scan {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+.preview-scale .sheet.preprint::after {
+  content: 'प्री-प्रिंटेड मोड — धुंधला डिज़ाइन केवल मार्गदर्शन हेतु, यह नहीं छपेगा';
+  position: absolute;
+  right: 4mm;
+  bottom: 2mm;
+  font: 600 3.4mm var(--font);
+  color: #1d4ed8;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 0.6mm 2mm;
+  border-radius: 1mm;
+  z-index: 6;
+}
+
+.cd-scan {
+  position: absolute;
+  inset: 0;
+  width: 297mm;
+  height: 210mm;
+  object-fit: fill;
+}
+
+/* ---------- Built-in certificate design ----------
+   A replica of the society's pre-printed sheet; every position is measured
+   from the real sheet in millimetres. Text is placed by its baseline from JS. */
+
+.cert-design {
+  position: absolute;
+  inset: 0;
+  font-family: 'Mukta', sans-serif;
+  color: #262626;
+  background: radial-gradient(ellipse at 50% 45%, #f6a24c 0%, #e8692a 55%, #c83a1c 100%);
+}
+
+.cert-design > * {
+  position: absolute;
+}
+
+.cd-band {
+  inset: 10.5mm;
+  background:
+    repeating-linear-gradient(45deg, rgba(178, 132, 46, 0.55) 0 0.45mm, transparent 0.45mm 1.5mm),
+    repeating-linear-gradient(-45deg, rgba(178, 132, 46, 0.55) 0 0.45mm, transparent 0.45mm 1.5mm),
+    #fbf1d6;
+  box-shadow: inset 0 0 0 0.35mm #a8792b;
+}
+
+.cd-paper {
+  inset: 15mm;
+  background: #fffdf8;
+  box-shadow: 0 0 0 0.35mm #c9a04a;
+}
+
+.cd-frame {
+  left: 20.5mm;
+  right: 20.5mm;
+  top: 19.3mm;
+  bottom: 19.3mm;
+  border: 0.5mm solid #7a2b1a;
+}
+
+.cd-watermark {
+  left: 149mm;
+  top: 98mm;
+  width: 62mm;
+  height: 62mm;
+  opacity: 0.08;
+}
+
+.cd-scroll {
+  left: 28.1mm;
+  top: 33mm;
+  width: 59.5mm;
+  height: 147mm;
+  background:
+    linear-gradient(180deg, transparent 84%, rgba(90, 20, 10, 0.35) 92%, transparent 100%),
+    linear-gradient(90deg, #b42d1a, #df5d29 28%, #e9702e 50%, #df5d29 72%, #b42d1a);
+}
+
+.cd-rod {
+  left: 22.4mm;
+  width: 69.6mm;
+  height: 6.6mm;
+  border-radius: 3.3mm;
+  background: linear-gradient(180deg, #8f1d10, #d9542a 45%, #9c2614);
+  box-shadow: -2mm 0 0 -1.3mm #d4a838, 2mm 0 0 -1.3mm #d4a838;
+}
+
+.cd-rod.top {
+  top: 28.2mm;
+}
+
+.cd-rod.bottom {
+  top: 177.5mm;
+}
+
+.cd-emblem {
+  left: 39.3mm;
+  top: 38.1mm;
+  width: 37mm;
+  height: 37mm;
+}
+
+.cd-art {
+  inset: 0;
+  width: 297mm;
+  height: 210mm;
+}
+
+.cd-art line {
+  stroke: #4a4a4a;
+  stroke-width: 0.3;
+}
+
+.cert-design .cd-t {
+  white-space: nowrap;
+  line-height: 1.3;
+  font-size: 11pt;
+}
+
+.cert-design .cd-t.mid {
+  transform: translateX(-50%);
+}
+
+.cd-t .ink {
+  display: inline-block;
+}
+
+.cd-title {
+  font-family: 'Rozha One', serif;
+  color: #c39a3e;
+}
+
+.cd-small {
+  color: #333;
+}
+
+.cd-small.latin {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.cd-addr,
+.cd-label,
+.cd-body {
+  color: #262626;
+  font-weight: 500;
+}
+
+.cd-body b {
+  font-weight: 700;
+  color: #111;
+}
+
+.cd-ribbon-text {
+  font-weight: 800;
+  color: #f6d24a;
+  text-shadow: 0 0.3mm 0 #6b2a00;
+}
+
+.cd-gold {
+  font-weight: 700;
+  color: #f4cf5a;
+}
+
+.cd-duty {
+  font-weight: 600;
+  color: #fff4e6;
+}
+
+/* Printed fields: zero-size marker that sits on the text baseline */
+.sheet .bl {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  vertical-align: baseline;
+}
+
+.sheet .f-text {
+  line-height: 1.3;
+}
+
+.preview-scale .sheet .f-text::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--baseline, 100%);
+  border-top: 0.3mm solid rgba(225, 29, 72, 0.75);
+  pointer-events: none;
+}
+
+/* ---------- Calibration test overlay ---------- */
+
+.calib-svg {
+  position: absolute;
+  inset: 0;
+  width: 297mm;
+  height: 210mm;
+  z-index: 8;
+  pointer-events: none;
+}
+
+/* ================= Printing ================= */
+
+#print-area {
+  position: fixed;
+  left: -20000px;
+  top: 0;
+}
+
+@page {
+  size: A4 landscape;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  body > *:not(#print-area) {
+    display: none !important;
+  }
+
+  #print-area {
+    position: static;
+    left: auto;
+  }
+
+  #print-area .sheet {
+    break-after: page;
+    page-break-after: always;
+    box-shadow: none;
+  }
+
+  #print-area .sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  #print-area .sheet.preprint .cert-design,
+  #print-area .sheet.preprint .cd-scan {
+    display: none !important;
+  }
+
+  #print-area .sheet .f {
+    outline: none !important;
+    background: none !important;
+  }
+
+  #print-area .sheet .f-sig.empty {
+    display: none;
+  }
+}

@@ -1,0 +1,69 @@
+<%- include('../partials/admin-top') %>
+
+<div class="grid cols-3">
+  <section class="card span-2">
+    <div class="card-head"><h2><%- icon('shield') %> एडमिन उपयोगकर्ता</h2></div>
+    <div class="card-body tight table-wrap">
+      <table class="table">
+        <thead><tr><th>नाम</th><th>भूमिका</th><th>अंतिम लॉगिन</th><th></th></tr></thead>
+        <tbody>
+        <% users.forEach((u) => { %>
+          <tr>
+            <td><div class="cell-main"><%= u.name || u.username %></div><div class="cell-sub mono">@<%= u.username %></div></td>
+            <td><span class="badge <%= u.role === 'superadmin' ? 'maroon' : 'blue' %>"><%= ROLE_LABEL[u.role] %></span></td>
+            <td class="small"><%= u.last_login_at ? formatDate(u.last_login_at, 'datetime') : '—' %></td>
+            <td>
+              <div class="actions">
+                <form method="post" action="/admin/users/<%= u.id %>/reset" class="inline-form toolbar">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="password" name="password" placeholder="नया पासवर्ड" minlength="8" required style="max-width:150px;padding:5px 8px" autocomplete="new-password">
+                  <button class="btn btn-outline btn-sm" type="submit"><%- icon('lock') %> रीसेट</button>
+                </form>
+                <% if (u.id !== admin.id) { %>
+                  <form method="post" action="/admin/users/<%= u.id %>/delete" class="inline-form" data-confirm="<%= u.username %> को हटाएँ?">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="btn btn-danger btn-sm btn-icon" type="submit" title="हटाएँ"><%- icon('trash') %></button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <div class="card-body">
+      <p class="hint" style="margin:0"><b>मुख्य एडमिन</b> सब कुछ कर सकते हैं। <b>उप-एडमिन</b> सदस्यों के मोबाइल नंबर केवल छिपे रूप में देख सकते हैं (निर्यात में भी), नंबर बदल या सदस्य हटा नहीं सकते, और व्हाट्सऐप गेटवे सेटिंग नहीं बदल सकते।</p>
+    </div>
+  </section>
+
+  <form class="card" method="post" action="/admin/users">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="card-head"><h2><%- icon('plus') %> नया एडमिन</h2></div>
+    <div class="card-body stack">
+      <div class="field">
+        <label for="name">नाम</label>
+        <input type="text" id="name" name="name" maxlength="80">
+      </div>
+      <div class="field">
+        <label for="username">उपयोगकर्ता नाम (अंग्रेज़ी)</label>
+        <input type="text" id="username" name="username" required pattern="[A-Za-z0-9_.\-]{3,40}" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="password">अस्थायी पासवर्ड</label>
+        <input type="password" id="password" name="password" minlength="8" required autocomplete="new-password">
+        <div class="hint">पहले लॉगिन पर उन्हें पासवर्ड बदलना होगा।</div>
+      </div>
+      <div class="field">
+        <label for="role">भूमिका</label>
+        <select id="role" name="role">
+          <option value="subadmin">उप-एडमिन</option>
+          <option value="superadmin">मुख्य एडमिन</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary btn-block" type="submit"><%- icon('plus') %> एडमिन बनाएँ</button></div>
+  </form>
+</div>
+
+<%- include('../partials/admin-bottom') %>

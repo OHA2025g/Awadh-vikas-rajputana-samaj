@@ -1,0 +1,62 @@
+<%- include('../partials/header') %>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="crumbs"><a href="/">मुखपृष्ठ</a> / सदस्यता फॉर्म</div>
+    <h1>सदस्यता फॉर्म</h1>
+    <p><%= site.org_name %>, <%= site.city %> का सदस्यता फॉर्म — बिल्कुल छपे हुए फॉर्म की तरह ऑनलाइन भरें। स्वीकृति के बाद आपका नाम सदस्य सूची में जोड़ा जाएगा।</p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:40px">
+  <div class="container join-layout">
+    <div>
+      <form class="form-card" id="join-form" action="/join" method="post" enctype="multipart/form-data" novalidate>
+        <div class="alert alert-error" id="join-error" hidden><%- icon('alert') %><span></span></div>
+
+        <%- include('../partials/membership-form', { mf: { mode: 'edit', m: {}, secure: true, applicant: true, dateText: today } }) %>
+
+        <input class="hp-field" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="form-footer">
+          <span class="hint"><%- icon('lock') %> आपकी जानकारी सुरक्षित रखी जाएगी। मोबाइल व आधार नंबर सार्वजनिक रूप से नहीं दिखाए जाते।</span>
+          <button class="btn btn-primary" type="submit" id="join-submit"><%- icon('send') %> फॉर्म जमा करें</button>
+        </div>
+      </form>
+
+      <div class="form-card success-panel" id="join-success" hidden>
+        <div class="success-icon"><%- icon('check') %></div>
+        <h2>सदस्यता फॉर्म सफलतापूर्वक जमा हुआ!</h2>
+        <p><span id="success-name"></span> जी, आपका फॉर्म स्वीकृति हेतु भेज दिया गया है। आपकी क्रमसंख्या (आवेदन क्रमांक) है:</p>
+        <div class="app-no" id="success-appno"></div>
+        <p class="hint">कृपया यह क्रमांक सुरक्षित रखें। संस्था द्वारा स्वीकृति के बाद आपका नाम सदस्य सूची में जोड़ दिया जाएगा।</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:12px">
+          <a class="btn btn-primary" href="/status"><%- icon('search') %> स्थिति जाँचें</a>
+          <a class="btn btn-outline" href="/">मुखपृष्ठ पर जाएँ</a>
+        </div>
+      </div>
+    </div>
+
+    <aside class="join-aside">
+      <div class="aside-card">
+        <h4><%- icon('info') %> फॉर्म भरने की प्रक्रिया</h4>
+        <ol>
+          <li>छपे हुए फॉर्म की तरह सभी जानकारी भरें (<b class="req">*</b> वाले खाने आवश्यक हैं)</li>
+          <li>फोटो वाले खाने पर क्लिक करके अपनी फोटो लगाएँ</li>
+          <li>घोषणा स्वीकार करें व हस्ताक्षर करें</li>
+          <li>फॉर्म जमा करें — आपको क्रमसंख्या मिलेगी</li>
+          <li>संस्था द्वारा जाँच एवं स्वीकृति के बाद सदस्य प्रमाण पत्र</li>
+        </ol>
+      </div>
+      <div class="aside-card">
+        <h4><%- icon('phone') %> सहायता</h4>
+        <p class="hint" style="margin:0">फॉर्म भरने में कठिनाई हो तो संपर्क करें:<br><b><%= site.phone %></b><br><%= site.email %></p>
+      </div>
+      <div class="aside-card">
+        <h4><%- icon('search') %> पहले फॉर्म भर चुके हैं?</h4>
+        <a class="btn btn-outline btn-sm btn-block" href="/status">आवेदन की स्थिति जाँचें</a>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<%- include('../partials/footer', { scripts: ['/js/signature-pad.js', '/js/join.js'] }) %>

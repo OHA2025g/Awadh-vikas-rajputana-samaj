@@ -1,0 +1,38 @@
+<%- include('../partials/header') %>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="crumbs"><a href="/">मुखपृष्ठ</a> / <a href="/events">गतिविधियाँ</a> / <%= event.title %></div>
+    <h1><%= event.title %></h1>
+    <p class="event-meta" style="color:#fbe0c4">
+      <span><%- icon('calendar') %> <%= formatDate(event.event_date) %></span>
+      <% if (event.event_time) { %><span><%- icon('clock') %> <%= event.event_time %></span><% } %>
+      <% if (event.location) { %><span><%- icon('map-pin') %> <%= event.location %></span><% } %>
+      <span class="tag <%= isUpcoming ? 'green' : '' %>"><%= isUpcoming ? 'आगामी' : 'संपन्न' %></span>
+    </p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:40px">
+  <div class="container">
+    <article class="article prose">
+      <% if (event.image) { %><img class="article-cover" src="<%= event.image %>" alt="<%= event.title %>"><% } %>
+      <% if (event.body) { %><%- event.body %><% } else if (event.summary) { %><p><%= event.summary %></p><% } %>
+
+      <% if (gallery.length) { %>
+        <h3 style="margin-top:28px">फोटो गैलरी</h3>
+        <div class="gallery" data-gallery>
+          <% for (const g of gallery) { %><a href="<%= g %>"><img src="<%= g %>" alt="" loading="lazy"></a><% } %>
+        </div>
+      <% } %>
+      <p style="margin-top:28px"><a class="btn btn-outline" href="/events"><%- icon('chevron-left') %> सभी गतिविधियाँ</a></p>
+    </article>
+  </div>
+</section>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="फोटो">
+  <button class="icon-btn" type="button" aria-label="बंद करें" data-close-lightbox><%- icon('x') %></button>
+  <img src="" alt="">
+</div>
+
+<%- include('../partials/footer') %>

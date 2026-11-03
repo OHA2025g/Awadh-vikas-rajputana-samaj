@@ -1,0 +1,676 @@
+/* The printed सदस्यता फॉर्म — shared by the public application, admin review and the printable copy. */
+
+.mf-paper {
+  --mf-ink: #1f1f1f;
+  --mf-line: #8d8d8d;
+  --mf-fill: #0d2f7a;
+  --mf-accent: #7a1414;
+  --mf-err: #c62828;
+  background: #fff;
+  color: var(--mf-ink);
+  font-family: 'Mukta', 'Noto Sans Devanagari', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  padding: 26px 32px 30px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.mf-paper .req {
+  color: var(--mf-err);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+/* ---------- Letterhead ---------- */
+
+.mf-top {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 20px;
+}
+
+.mf-reg {
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.mf-brand {
+  text-align: center;
+  margin-top: 6px;
+}
+
+.mf-brand h2 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-family: 'Rozha One', 'Mukta', serif;
+  font-weight: 400;
+  font-size: clamp(24px, 4.6vw, 38px);
+  line-height: 1.25;
+  color: var(--mf-ink);
+}
+
+.mf-bars {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'Mukta', serif;
+  font-weight: 700;
+}
+
+.mf-sw {
+  width: 0.78em;
+  height: 0.78em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.8;
+  stroke-linecap: square;
+  margin: 0 1px;
+}
+
+.mf-sw circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+.mf-addr {
+  margin: 2px 0 0;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.mf-contact {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13.5px;
+}
+
+.mf-titlebar {
+  border-top: 2px solid var(--mf-ink);
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.mf-title {
+  background: #3d3d3d;
+  color: #fff;
+  font-weight: 700;
+  padding: 2px 18px 4px;
+  border-radius: 0 0 9px 9px;
+}
+
+.mf-headgrid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: start;
+  margin-top: -6px;
+}
+
+.mf-meta {
+  margin: 14px 0 6px;
+  padding-left: 1.3em;
+  display: grid;
+  gap: 8px;
+}
+
+.mf-photo {
+  width: 112px;
+  height: 136px;
+  border: 1.5px solid var(--mf-ink);
+  border-radius: 8px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 4px;
+  font-weight: 700;
+  background: #fff center / cover no-repeat;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+label.mf-photo {
+  cursor: pointer;
+  border-style: dashed;
+  background-color: #fffaf2;
+}
+
+.mf-photo small {
+  font-weight: 400;
+  font-size: 12px;
+  color: #777;
+  line-height: 1.3;
+}
+
+.mf-photo img {
+  width: 112px;
+  height: 136px;
+  object-fit: cover;
+  display: block;
+}
+
+.mf-photo.has-image {
+  border-style: solid;
+}
+
+.mf-photo.has-image > * {
+  display: none;
+}
+
+.mf-photo-wrap .field-error {
+  max-width: 130px;
+}
+
+/* ---------- Blanks ---------- */
+
+.mf-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 20px;
+  padding-left: 2em;
+  position: relative;
+  margin-top: 6px;
+}
+
+.mf-numbered {
+  margin-top: 14px;
+}
+
+.mf-no {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  font-weight: 700;
+}
+
+.mf-lead {
+  font-weight: 700;
+  padding-bottom: 5px;
+}
+
+.mf-para {
+  padding-bottom: 0;
+}
+
+.mf-f {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  column-gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+
+.w-full {
+  flex: 1 1 100%;
+}
+
+.mf-multi {
+  align-items: flex-start;
+}
+
+.mf-multi .mf-l {
+  padding: 3px 0 0;
+}
+
+.mf-paper .mf-multi .mf-v {
+  white-space: pre-line;
+  line-height: 30px;
+  padding-top: 0;
+}
+
+.w-lg {
+  flex: 3 1 320px;
+}
+
+.w-md {
+  flex: 2 1 210px;
+}
+
+.w-sm {
+  flex: 1 1 150px;
+}
+
+.w-xs {
+  flex: 0 1 132px;
+}
+
+.mf-l {
+  white-space: nowrap;
+  font-weight: 600;
+  padding-bottom: 5px;
+}
+
+.mf-paper .mf-in,
+.mf-paper .mf-v {
+  flex: 1 1 60px;
+  min-width: 48px;
+  border: 0;
+  border-bottom: 1.5px dotted var(--mf-line);
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--mf-fill);
+  padding: 3px 4px 2px;
+  min-height: 32px;
+  box-shadow: none;
+  outline: none;
+  width: auto;
+}
+
+.mf-paper .mf-v {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.mf-paper .mf-inline {
+  display: inline-block;
+  min-width: 180px;
+  min-height: 0;
+}
+
+.mf-paper textarea.mf-in {
+  resize: vertical;
+  line-height: 30px;
+  min-height: 64px;
+  padding-top: 0;
+  border-bottom: 0;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 29px, var(--mf-line) 29px 30px);
+  background-attachment: local;
+}
+
+.mf-paper .mf-in:focus {
+  border-bottom: 2px solid var(--mf-accent);
+  background-color: #fff7e8;
+  box-shadow: none;
+}
+
+.mf-in::placeholder {
+  color: #b3b3b3;
+  font-weight: 400;
+}
+
+.mf-paper .field-error {
+  display: none;
+  flex-basis: 100%;
+  color: var(--mf-err);
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.mf-paper .has-error > .field-error {
+  display: block;
+}
+
+.mf-paper .has-error .mf-in {
+  border-bottom: 2px solid var(--mf-err);
+  background-color: #fff2f2;
+}
+
+.mf-paper .has-error .mf-photo,
+.mf-paper .has-error .sig-wrap {
+  border-color: var(--mf-err);
+}
+
+.mf-trow {
+  column-gap: 16px;
+}
+
+.mf-trow .w-lg,
+.mf-trow .w-md {
+  flex: 2 1 140px;
+}
+
+.mf-trow .w-sm {
+  flex: 1 1 110px;
+}
+
+.mf-trow .w-xs {
+  flex: 0 0 100px;
+}
+
+.mf-paper .mf-trow .w-xs .mf-in,
+.mf-paper .mf-trow .w-xs .mf-v {
+  min-width: 36px;
+}
+
+.mf-trow .mf-f:last-child {
+  flex: 1 1 150px;
+}
+
+/* ---------- Declaration & signatures ---------- */
+
+.mf-decl {
+  margin: 4px 0 0 2em;
+  line-height: 1.7;
+}
+
+.mf-agree {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0 0 2em;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mf-agree input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--mf-accent);
+}
+
+.mf-signrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 30px;
+  align-items: flex-end;
+  margin: 14px 0 0 2em;
+}
+
+.mf-sign {
+  flex: 1 1 320px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 460px;
+}
+
+.mf-sign .sig-wrap,
+.mf-sign .sig-actions {
+  flex-basis: 100%;
+}
+
+.mf-sign .sig-wrap canvas {
+  height: 150px;
+}
+
+.mf-sigimg {
+  flex: 1;
+  border-bottom: 1.5px dotted var(--mf-line);
+}
+
+.mf-sigimg img {
+  display: block;
+  max-height: 70px;
+  max-width: 260px;
+}
+
+.mf-office {
+  margin-top: 22px;
+}
+
+.mf-office.is-blank {
+  opacity: 0.55;
+}
+
+.mf-office-title {
+  font-weight: 700;
+}
+
+.mf-office-title small {
+  font-weight: 400;
+  font-size: 13px;
+}
+
+.mf-sigs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-top: 40px;
+  font-size: 14px;
+}
+
+.mf-sigs > div {
+  display: grid;
+  gap: 2px;
+}
+
+.mf-sigs b {
+  font-weight: 700;
+}
+
+/* ---------- Narrow screens (the A4 print page keeps its sheet layout) ---------- */
+
+@media (max-width: 640px) {
+  body:not(.mf-print-page) .mf-paper {
+    padding: 18px 14px 22px;
+    font-size: 15px;
+  }
+
+  body:not(.mf-print-page) .mf-top {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  body:not(.mf-print-page) .mf-reg {
+    position: static;
+  }
+
+  body:not(.mf-print-page) .mf-brand h2 {
+    gap: 4px;
+  }
+
+  body:not(.mf-print-page) .mf-headgrid {
+    grid-template-columns: 1fr 96px;
+    gap: 10px;
+  }
+
+  body:not(.mf-print-page) .mf-photo,
+  body:not(.mf-print-page) .mf-photo img {
+    width: 96px;
+    height: 118px;
+  }
+
+  body:not(.mf-print-page) .mf-paper .mf-inline {
+    min-width: 0;
+  }
+
+  body:not(.mf-print-page) .mf-row,
+  body:not(.mf-print-page) .mf-decl,
+  body:not(.mf-print-page) .mf-agree,
+  body:not(.mf-print-page) .mf-signrow {
+    padding-left: 0;
+    margin-left: 0;
+  }
+
+  body:not(.mf-print-page) .mf-numbered {
+    padding-left: 1.7em;
+  }
+
+  body:not(.mf-print-page) .mf-trow {
+    border-left: 3px solid #f0e2cf;
+    padding: 2px 0 6px 10px;
+  }
+
+  body:not(.mf-print-page) .mf-sigs {
+    grid-template-columns: repeat(2, 1fr);
+    margin-top: 24px;
+  }
+}
+
+/* ---------- Printable copy (A4 portrait) ---------- */
+
+.mf-print-page {
+  margin: 0;
+  background: #e9e9e9;
+  padding: 20px 0 40px;
+}
+
+/* One A4 sheet: every row stays on one line like the paper, and the office signatures take the spare space. */
+.mf-print-page .mf-paper {
+  width: 210mm;
+  max-width: none;
+  min-height: 297mm;
+  box-sizing: border-box;
+  padding: 9mm 11mm 10mm;
+  font-size: 12.5px;
+  line-height: 1.3;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 6px 30px rgb(0 0 0 / 0.18);
+}
+
+.mf-print-page .mf-brand h2 {
+  font-size: 30px;
+}
+
+.mf-print-page .mf-addr {
+  font-size: 13.5px;
+}
+
+.mf-print-page .mf-contact {
+  font-size: 12px;
+}
+
+.mf-print-page .mf-meta {
+  margin: 10px 0 4px;
+  gap: 6px;
+}
+
+.mf-print-page .mf-photo,
+.mf-print-page .mf-photo img {
+  width: 26mm;
+  height: 32mm;
+}
+
+.mf-print-page .mf-photo {
+  margin-top: -7mm;
+  position: relative;
+}
+
+.mf-print-page .mf-row {
+  flex-wrap: nowrap;
+  column-gap: 12px;
+  margin-top: 2px;
+}
+
+.mf-print-page .mf-numbered {
+  margin-top: 7px;
+}
+
+.mf-print-page .mf-no {
+  top: 2px;
+}
+
+.mf-print-page .mf-f {
+  flex-wrap: nowrap;
+  column-gap: 4px;
+}
+
+.mf-print-page .mf-l,
+.mf-print-page .mf-lead {
+  padding-bottom: 2px;
+}
+
+.mf-print-page .mf-lead {
+  flex: none;
+  white-space: nowrap;
+}
+
+.mf-print-page .mf-para {
+  flex: 1 1 auto;
+  white-space: normal;
+}
+
+.mf-print-page .mf-paper .mf-in,
+.mf-print-page .mf-paper .mf-v {
+  min-height: 0;
+  min-width: 30px;
+  padding: 1px 3px;
+}
+
+.mf-print-page .mf-paper .mf-multi .mf-v {
+  line-height: 20px;
+  min-height: 42px;
+}
+
+.mf-print-page .mf-decl {
+  margin-top: 2px;
+  line-height: 1.5;
+}
+
+.mf-print-page .mf-signrow {
+  margin-top: 10px;
+}
+
+.mf-print-page .mf-sigimg img {
+  max-height: 48px;
+}
+
+.mf-print-page .mf-office {
+  margin-top: auto;
+  padding-top: 8mm;
+}
+
+.mf-print-page .mf-sigs {
+  margin-top: 16mm;
+  font-size: 12.5px;
+}
+
+.mf-toolbar {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 16px;
+  font-family: 'Mukta', system-ui, sans-serif;
+}
+
+.mf-toolbar button,
+.mf-toolbar a {
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid #7a1414;
+  background: #7a1414;
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.mf-toolbar a {
+  background: #fff;
+  color: #7a1414;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  .mf-noprint {
+    display: none !important;
+  }
+
+  .mf-print-page {
+    background: #fff;
+    padding: 0;
+  }
+
+  .mf-print-page .mf-paper {
+    box-shadow: none;
+    min-height: 296mm;
+  }
+
+  .mf-paper,
+  .mf-photo,
+  .mf-title {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

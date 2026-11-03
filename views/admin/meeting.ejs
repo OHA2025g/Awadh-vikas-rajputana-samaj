@@ -1,0 +1,87 @@
+<%- include('../partials/admin-top') %>
+<%
+  const images = m.files.filter((f) => f.kind === 'image');
+  const pdfs = m.files.filter((f) => f.kind === 'pdf');
+  const fileUrl = (f) => '/admin/meetings/files/' + f.id;
+  const kb = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+%>
+
+<p class="no-print"><a href="/admin/meetings"><%- icon('chevron-left') %> बैठक विवरण (सभी बैठकें)</a></p>
+
+<article class="card meeting-sheet">
+  <div class="print-head">
+    <img src="<%= site.logo %>" alt="">
+    <div>
+      <strong><%= site.org_name %>, <%= site.city %></strong>
+      <span>रजि. नं. <%= site.reg_no %> • बैठक कार्यवृत्त</span>
+    </div>
+  </div>
+  <div class="card-head">
+    <div>
+      <div class="mt-date"><%- icon('calendar') %> <%= formatDate(m.meeting_date) %><%= m.meeting_time ? ' • समय ' + m.meeting_time : '' %></div>
+      <h2 class="meeting-title"><%= m.title %></h2>
+    </div>
+    <div class="actions no-print">
+      <button class="btn btn-outline btn-sm" type="button" data-print><%- icon('printer') %> प्रिंट</button>
+      <a class="btn btn-primary btn-sm" href="/admin/meetings/<%= m.id %>/edit"><%- icon('edit') %> संपादित करें</a>
+      <% if (isSuper) { %>
+        <form method="post" action="/admin/meetings/<%= m.id %>/delete" class="inline-form" data-confirm="यह बैठक और इसकी सभी संलग्न फ़ाइलें स्थायी रूप से हटाएँ?">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn btn-outline btn-sm" type="submit"><%- icon('trash') %> हटाएँ</button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+  <div class="card-body">
+    <dl class="kv">
+      <dt>स्थान</dt><dd><%= m.venue || '—' %></dd>
+      <dt>समिति / प्रकार</dt><dd><%= m.committee_name || 'सामान्य बैठक' %></dd>
+      <dt>दर्ज कर्ता</dt><dd><%= m.admin_name || m.admin_username || '—' %> <span class="muted small">(<%= formatDate(m.created_at, 'datetime') %><%= m.updated_at ? ', संपादित ' + formatDate(m.updated_at, 'datetime') : '' %>)</span></dd>
+    </dl>
+  </div>
+
+  <div class="card-head"><h3><%- icon('users') %> उपस्थित (<%= m.attendeeList.length %>)</h3></div>
+  <div class="card-body">
+    <% if (m.attendeeList.length) { %>
+      <ol class="att-list">
+        <% m.attendeeList.forEach((a) => { %>
+          <li><span class="att-name"><%= a.name %></span><% if (a.role) { %> <span class="muted small">— <%= a.role %></span><% } %><% if (!a.id) { %> <span class="badge gray">अतिथि</span><% } %></li>
+        <% }) %>
+      </ol>
+    <% } else { %>
+      <p class="muted">उपस्थिति दर्ज नहीं की गई।</p>
+    <% } %>
+  </div>
+
+  <div class="card-head"><h3><%- icon('file-text') %> कार्यवाही विवरण एवं निर्णय</h3></div>
+  <div class="card-body minutes-body">
+    <% if (m.minutes) { %><%- m.minutes %><% } else { %><p class="muted">कार्यवाही विवरण नहीं लिखा गया।</p><% } %>
+  </div>
+
+  <div class="card-head no-print"><h3><%- icon('paperclip') %> संलग्न स्कैन (<%= m.files.length %>)</h3></div>
+  <div class="card-body no-print">
+    <% if (!m.files.length) { %>
+      <p class="muted">कोई फ़ाइल संलग्न नहीं। <a href="/admin/meetings/<%= m.id %>/edit">रजिस्टर के फ़ोटो जोड़ें</a></p>
+    <% } else { %>
+      <div class="file-grid">
+        <% images.forEach((f) => { %>
+          <a class="file-tile" href="<%= fileUrl(f) %>" data-lightbox="meeting" data-caption="<%= f.original_name || m.title %>">
+            <img src="<%= fileUrl(f) %>" alt="<%= f.original_name || '' %>" loading="lazy">
+            <span class="file-name"><%= f.original_name || 'चित्र' %></span>
+            <span class="muted small"><%= kb(f.size || 0) %></span>
+          </a>
+        <% }) %>
+        <% pdfs.forEach((f) => { %>
+          <a class="file-tile" href="<%= fileUrl(f) %>" data-lightbox="meeting" data-kind="pdf" data-caption="<%= f.original_name || 'PDF दस्तावेज़' %>">
+            <span class="pdf-thumb"><%- icon('file-text') %> PDF</span>
+            <span class="file-name"><%= f.original_name || 'PDF दस्तावेज़' %></span>
+            <span class="muted small"><%= kb(f.size || 0) %></span>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</article>
+
+<%- include('../partials/lightbox') %>
+<%- include('../partials/admin-bottom', { scripts: ['/js/admin-records.js'] }) %>

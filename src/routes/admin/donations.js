@@ -1,0 +1,238 @@
+import express from 'express';
+import ExcelJS from 'exceljs';
+import { db } from '../../db.js';
+import { DONATION_CATEGORY_KEYS, DONATION_CATEGORY_LABEL, PAYMENT_MODE_KEYS, PAYMENT_MODE_LABEL } from '../../config.js';
+import { flash, requireSuper } from '../../middleware/auth.js';
+import { donationFilters, listDonations, allDonations, getDonation, donationTotals } from '../../lib/donations.js';
+import { likeTerm } from '../../lib/members.js';
+import { str, int, bool, paginate, todayISO, isISODate, parseAmountPaise, formatINR, formatDate, csvCell } from '../../lib/util.js';
+
+const router = express.Router();
+const PER_PAGE = 50;
+
+const queryString = (filters) =>
+  new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== '' && v != null)).toString();
+
+const memberStmt = db.prepare('SELECT id, salutation, name, member_no, city, status FROM members WHERE id = ?');
+const memberLabel = (m) => [m.salutation, m.name].filter(Boolean).join(' ');
+
+router.get('/donations', (req, res) => {
+  const filters = donationFilters(req.query);
+  const totals = donationTotals(filters);
+  const pg = paginate(totals[filters.category || 'all'].n, int(req.query.page), PER_PAGE);
+  const { rows } = listDonations(filters, { limit: PER_PAGE, offset: pg.offset });
+  res.render('admin/donations', {
+    pageTitle: 'दान एवं भुगतान',
+    filters,
+    totals,
+    rows,
+    pg,
+    qs: queryString(filters),
+  });
+});
+
+/** Approved members for the entry form's search box. Phone numbers are deliberately not returned. */
+router.get('/donations/members', (req, res) => {
+  const q = str(req.query.q, 60);
+  const where = q
+    ? `AND (m.name LIKE @q ESCAPE '\\' OR m.name_en LIKE @q ESCAPE '\\' OR m.member_no LIKE @q ESCAPE '\\' OR m.city LIKE @q ESCAPE '\\')`
+    : '';
+  const rows = db
+    .prepare(
+      `SELECT m.id, m.salutation, m.name, m.member_no, m.city, md.name AS mandal_name,
+              (SELECT COUNT(*) FROM donations d WHERE d.member_id = m.id AND d.category = 'lifetime') AS lifetime_count
+       FROM members m LEFT JOIN mandals md ON md.id = m.mandal_id
+       WHERE m.status = 'approved' ${where}
+       ORDER BY m.name COLLATE NOCASE LIMIT 20`
+    )
+    .all(q ? { q: likeTerm(q) } : {});
+  res.json({
+    members: rows.map((m) => ({
+      id: m.id,
+      name: memberLabel(m),
+      member_no: m.member_no || '',
+      place: [m.city, m.mandal_name].filter(Boolean).join(' • '),
+      lifetime_paid: m.lifetime_count > 0,
+    })),
+  });
+});
+
+function blankDonation(query) {
+  const member = int(query.member) ? memberStmt.get(int(query.member)) : null;
+  return {
+    category: DONATION_CATEGORY_KEYS.includes(query.category) ? query.category : 'lifetime',
+    payment_mode: 'cash',
+    paid_on: todayISO(),
+    amount: '',
+    reference: '',
+    details: '',
+    anonymous: 0,
+    ...(member?.status === 'approved' ? { member_id: member.id, name: memberLabel(member), member_no: member.member_no } : {}),
+  };
+}
+
+/** Paise → "1500" or "1500.50" for the amount input. */
+const amountInput = (paise) => (paise % 100 === 0 ? String(paise / 100) : (paise / 100).toFixed(2));
+
+function renderForm(res, d, errors = []) {
+  res.status(errors.length ? 422 : 200).render('admin/donation-form', {
+    pageTitle: d.id ? 'दान प्रविष्टि संपादित करें' : 'नई दान / भुगतान प्रविष्टि',
+    d,
+    errors,
+    today: todayISO(),
+  });
+}
+
+/**
+ * Validate the entry form. A donation whose member was later deleted keeps its saved
+ * donor name; any newly chosen member must be approved.
+ */
+function parseDonation(body, existing = null) {
+  const errors = [];
+  const memberId = int(body.member_id);
+  const member = memberId ? memberStmt.get(memberId) : null;
+  const keepsOldMember = existing && memberId === existing.member_id;
+  let donorName = existing?.donor_name || '';
+  if (member && (member.status === 'approved' || keepsOldMember)) donorName = memberLabel(member);
+  else if (!(existing && !existing.member_id && !memberId)) errors.push('कृपया स्वीकृत सदस्यों में से एक सदस्य चुनें।');
+
+  const category = DONATION_CATEGORY_KEYS.includes(body.category) ? body.category : '';
+  if (!category) errors.push('दान की श्रेणी चुनें।');
+  const amountPaise = parseAmountPaise(body.amount);
+  if (!amountPaise) errors.push('मान्य राशि (₹) दर्ज करें, जैसे 1100 या 501.50।');
+  const mode = PAYMENT_MODE_KEYS.includes(body.payment_mode) ? body.payment_mode : '';
+  if (!mode) errors.push('भुगतान का प्रकार चुनें।');
+  const paidOn = isISODate(body.paid_on) ? body.paid_on : '';
+  if (!paidOn) errors.push('भुगतान की तिथि दर्ज करें।');
+  else if (paidOn > todayISO()) errors.push('भुगतान की तिथि भविष्य की नहीं हो सकती।');
+
+  const v = {
+    member_id: member ? member.id : existing?.member_id ?? null,
+    donor_name: donorName,
+    category,
+    amount_paise: amountPaise,
+    payment_mode: mode,
+    reference: str(body.reference, 100),
+    details: str(body.details, 200),
+    paid_on: paidOn,
+    anonymous: bool(body.anonymous),
+  };
+  const formValues = {
+    ...v,
+    id: existing?.id,
+    name: donorName,
+    member_no: member?.member_no || existing?.member_no || '',
+    amount: str(body.amount, 20),
+  };
+  return { v, errors, formValues };
+}
+
+router.get('/donations/new', (req, res) => renderForm(res, blankDonation(req.query)));
+
+router.post('/donations', (req, res) => {
+  const { v, errors, formValues } = parseDonation(req.body ?? {});
+  if (errors.length) return renderForm(res, formValues, errors);
+  db.prepare(
+    `INSERT INTO donations (member_id, donor_name, category, amount_paise, payment_mode, reference, details, paid_on, anonymous, admin_id)
+     VALUES (@member_id, @donor_name, @category, @amount_paise, @payment_mode, @reference, @details, @paid_on, @anonymous, @admin_id)`
+  ).run({ ...v, admin_id: req.admin.id });
+  flash(req, 'success', `${v.donor_name} की ${formatINR(v.amount_paise)} की प्रविष्टि (${DONATION_CATEGORY_LABEL[v.category]}) सहेजी गई।`);
+  res.redirect(req.body?.again ? `/admin/donations/new?category=${v.category}` : `/admin/donations?category=${v.category}`);
+});
+
+router.get('/donations/:id/edit', (req, res, next) => {
+  const d = getDonation(req.params.id);
+  if (!d) return next();
+  renderForm(res, { ...d, amount: amountInput(d.amount_paise) });
+});
+
+router.post('/donations/:id', (req, res, next) => {
+  const existing = getDonation(req.params.id);
+  if (!existing) return next();
+  const { v, errors, formValues } = parseDonation(req.body ?? {}, existing);
+  if (errors.length) return renderForm(res, formValues, errors);
+  db.prepare(
+    `UPDATE donations SET member_id = @member_id, donor_name = @donor_name, category = @category, amount_paise = @amount_paise,
+       payment_mode = @payment_mode, reference = @reference, details = @details, paid_on = @paid_on, anonymous = @anonymous,
+       updated_by = @updated_by, updated_at = CURRENT_TIMESTAMP
+     WHERE id = @id`
+  ).run({ ...v, updated_by: req.admin.id, id: existing.id });
+  flash(req, 'success', 'प्रविष्टि अपडेट की गई।');
+  res.redirect(`/admin/donations?category=${v.category}`);
+});
+
+router.post('/donations/:id/delete', requireSuper, (req, res) => {
+  const d = getDonation(req.params.id);
+  if (d) {
+    db.prepare('DELETE FROM donations WHERE id = ?').run(d.id);
+    flash(req, 'success', `${d.name} की ${formatINR(d.amount_paise)} की प्रविष्टि हटाई गई।`);
+  }
+  res.redirect(`/admin/donations${d ? `?category=${d.category}` : ''}`);
+});
+
+/* ---------- Ledger export ---------- */
+
+const EXPORT_COLUMNS = [
+  ['sr', 'क्रम संख्या', 8],
+  ['paid_on_out', 'दिनांक', 14],
+  ['member_no', 'सदस्य क्रमांक', 14],
+  ['name', 'सदस्य का नाम', 28],
+  ['category_out', 'श्रेणी', 20],
+  ['amount', 'राशि (₹)', 14],
+  ['mode_out', 'भुगतान प्रकार', 16],
+  ['reference', 'संदर्भ संख्या', 22],
+  ['details', 'लेन-देन विवरण', 32],
+  ['anonymous_out', 'गुप्त दान', 10],
+  ['entered_by', 'प्रविष्टि कर्ता', 18],
+];
+
+function exportRows(req) {
+  return allDonations(donationFilters(req.query)).map((d, i) => ({
+    ...d,
+    sr: i + 1,
+    paid_on_out: formatDate(d.paid_on, 'numeric'),
+    category_out: DONATION_CATEGORY_LABEL[d.category] || d.category,
+    amount: d.amount_paise / 100,
+    mode_out: PAYMENT_MODE_LABEL[d.payment_mode] || d.payment_mode,
+    anonymous_out: d.anonymous ? 'हाँ' : '',
+    entered_by: d.admin_name || d.admin_username || '',
+  }));
+}
+
+const exportName = (req, ext) => {
+  const cat = DONATION_CATEGORY_KEYS.includes(req.query.category) ? `-${req.query.category}` : '';
+  return `donations${cat}-${todayISO()}.${ext}`;
+};
+
+router.get('/donations/export.csv', (req, res) => {
+  const rows = exportRows(req);
+  const lines = [EXPORT_COLUMNS.map(([, label]) => csvCell(label)).join(',')];
+  for (const r of rows) lines.push(EXPORT_COLUMNS.map(([key]) => csvCell(key === 'amount' ? r.amount.toFixed(2) : r[key])).join(','));
+  const total = rows.reduce((s, r) => s + r.amount_paise, 0);
+  lines.push(EXPORT_COLUMNS.map(([key]) => csvCell(key === 'name' ? 'कुल' : key === 'amount' ? (total / 100).toFixed(2) : '')).join(','));
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.set('Content-Disposition', `attachment; filename="${exportName(req, 'csv')}"`);
+  res.send(`\uFEFF${lines.join('\r\n')}`);
+});
+
+router.get('/donations/export.xlsx', async (req, res) => {
+  const rows = exportRows(req);
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Awadh Rajput Vikas Sangh';
+  const ws = wb.addWorksheet('दान खाता');
+  ws.columns = EXPORT_COLUMNS.map(([key, header, width]) => ({ header, key, width }));
+  // Excel has no lakh grouping; these conditional sections render ₹1,00,000.00 style.
+  ws.getColumn('amount').numFmt = '[>=10000000]"₹"##\\,##\\,##\\,##0.00;[>=100000]"₹"##\\,##\\,##0.00;"₹"##,##0.00';
+  ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8B1E1E' } };
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+  for (const r of rows) ws.addRow(Object.fromEntries(EXPORT_COLUMNS.map(([key]) => [key, r[key] ?? ''])));
+  const totalRow = ws.addRow({ name: 'कुल', amount: rows.reduce((s, r) => s + r.amount_paise, 0) / 100 });
+  totalRow.font = { bold: true };
+  res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.set('Content-Disposition', `attachment; filename="${exportName(req, 'xlsx')}"`);
+  await wb.xlsx.write(res);
+  res.end();
+});
+
+export default router;

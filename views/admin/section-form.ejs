@@ -1,0 +1,107 @@
+<%- include('../partials/admin-top') %>
+<%
+  const isNew = !s.id;
+  const isCustom = s.kind === 'custom';
+  const isBlock = s.kind === 'block';
+%>
+
+<p><a href="/admin/sections"><%- icon('chevron-left') %> सभी अनुभाग</a></p>
+
+<% if (errors.length) { %>
+  <div class="flash error"><%- icon('alert') %> <span><%= errors.join(' ') %></span></div>
+<% } %>
+
+<form method="post" action="<%= isNew ? '/admin/sections' : '/admin/sections/' + s.id %>" enctype="multipart/form-data">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <div class="grid cols-3">
+    <div class="span-2">
+      <section class="card">
+        <div class="card-head">
+          <h2><%- icon('edit') %> विषय-वस्तु</h2>
+          <% if (!isNew && s.show_on_home) { %><div class="actions"><a class="btn btn-outline btn-sm" href="/#<%= s.slug %>" target="_blank" rel="noopener"><%- icon('external-link') %> वेबसाइट पर देखें</a></div><% } %>
+        </div>
+        <div class="card-body stack">
+          <div class="field">
+            <label for="title">शीर्षक <span class="req">*</span></label>
+            <input type="text" id="title" name="title" value="<%= s.title || '' %>" required maxlength="150">
+          </div>
+          <div class="field">
+            <label for="subtitle">उपशीर्षक</label>
+            <input type="text" id="subtitle" name="subtitle" value="<%= s.subtitle || '' %>" maxlength="200">
+          </div>
+          <% if (!isBlock) { %>
+            <div class="field">
+              <label for="body"><%= bodyLabels[0] %></label>
+              <textarea id="body" name="body" data-rte placeholder="यहाँ विवरण लिखें…"><%= s.body || '' %></textarea>
+            </div>
+            <% if (s.slug === 'vision-mission') { %>
+              <div class="field">
+                <label for="body2"><%= bodyLabels[1] %></label>
+                <textarea id="body2" name="body2" data-rte><%= s.body2 || '' %></textarea>
+              </div>
+            <% } %>
+          <% } else { %>
+            <div class="flash info" style="margin:0">
+              <%- icon('info') %>
+              <span>यह अनुभाग डेटा से स्वतः बनता है। यहाँ आप केवल शीर्षक, उपशीर्षक और दृश्यता बदल सकते हैं।
+                <% if (manage) { %><a href="<%= manage[0] %>"><b><%= manage[1] %> →</b></a><% } %></span>
+            </div>
+          <% } %>
+        </div>
+      </section>
+    </div>
+
+    <div>
+      <section class="card">
+        <div class="card-head"><h2><%- icon('sliders') %> प्रदर्शन</h2></div>
+        <div class="card-body stack">
+          <label class="check"><input type="checkbox" name="visible" value="1" <%= s.visible ? 'checked' : '' %>> वेबसाइट पर दिखाएँ</label>
+          <label class="check"><input type="checkbox" name="show_on_home" value="1" <%= s.show_on_home ? 'checked' : '' %>> मुखपृष्ठ पर अनुभाग के रूप में दिखाएँ</label>
+          <div class="field">
+            <label for="nav_label">मेनू लेबल (छोटा नाम)</label>
+            <input type="text" id="nav_label" name="nav_label" value="<%= s.nav_label || '' %>" maxlength="40">
+          </div>
+          <% if (isCustom) { %>
+            <div class="field">
+              <label for="slug">URL नाम (slug)</label>
+              <input type="text" id="slug" name="slug" value="<%= s.slug || '' %>" maxlength="60" placeholder="जैसे: scholarship">
+              <div class="hint">खाली छोड़ने पर शीर्षक से बनेगा। पेज का पता: /page/&lt;slug&gt;</div>
+            </div>
+            <label class="check"><input type="checkbox" name="has_page" value="1" <%= s.has_page ? 'checked' : '' %>> अलग पेज भी बनाएँ</label>
+            <label class="check"><input type="checkbox" name="show_in_nav" value="1" <%= s.show_in_nav ? 'checked' : '' %>> पेज को मुख्य मेनू में जोड़ें</label>
+          <% } %>
+          <% if (!isBlock) { %>
+            <div class="field">
+              <label for="layout">लेआउट</label>
+              <select id="layout" name="layout">
+                <option value="image-right" <%= s.layout === 'image-right' ? 'selected' : '' %>>पाठ बाएँ, चित्र दाएँ</option>
+                <option value="image-left" <%= s.layout === 'image-left' ? 'selected' : '' %>>चित्र बाएँ, पाठ दाएँ</option>
+                <option value="full" <%= s.layout === 'full' ? 'selected' : '' %>>पूरी चौड़ाई (चित्र ऊपर)</option>
+              </select>
+            </div>
+          <% } %>
+        </div>
+      </section>
+
+      <% if (!isBlock) { %>
+      <section class="card">
+        <div class="card-head"><h2><%- icon('image') %> चित्र</h2></div>
+        <div class="card-body stack">
+          <img id="sec-img" class="photo-box" style="aspect-ratio:4/3;max-width:100%" src="<%= s.image || '' %>" alt="" <%= s.image ? '' : 'hidden' %>>
+          <input type="file" name="image" accept="image/jpeg,image/png,image/webp" data-preview="#sec-img">
+          <% if (s.image) { %><label class="check small"><input type="checkbox" name="remove_image" value="1"> चित्र हटाएँ</label><% } %>
+        </div>
+      </section>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="form-actions">
+      <button class="btn btn-primary btn-lg" type="submit"><%- icon('save') %> <%= isNew ? 'अनुभाग बनाएँ' : 'सहेजें' %></button>
+      <a class="btn btn-outline" href="/admin/sections">रद्द करें</a>
+    </div>
+  </div>
+</form>
+
+<%- include('../partials/admin-bottom') %>

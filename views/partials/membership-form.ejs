@@ -1,0 +1,203 @@
+<%
+  /*
+   * The printed सदस्यता फॉर्म, field for field.
+   *   mf.mode      'edit' (inputs) or 'view' (filled-in values)
+   *   mf.m         member / application row (or {} for a blank form)
+   *   mf.secure    full mobile + Aadhaar numbers visible and editable (applicant, main admin)
+   *   mf.applicant public application: photo upload, signature pad, declaration checkbox
+   *   mf.dateText  the form's दिनांक
+   */
+  const { mode = 'view', m = {}, secure = false, applicant = false, dateText = '' } = mf;
+  const edit = mode === 'edit';
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const dn = (n) => String(n).replace(/\d/g, (d) => '०१२३४५६७८९'[d]);
+  const local10 = (p) => {
+    const d = String(p ?? '').replace(/\D/g, '');
+    return d.length > 10 ? d.slice(-10) : d;
+  };
+  const phoneOut = secure ? formatPhone : maskPhone;
+  const family = formRows(m.family);
+  const relatives = formRows(m.relatives);
+  const swastik =
+    '<svg class="mf-sw" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12V4h7M12 12h8v7M12 12v8H5M12 12H4V5"/>' +
+    '<circle cx="8" cy="8" r="1.5"/><circle cx="16" cy="8" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="8" cy="16" r="1.5"/></svg>';
+  const bars = `<span class="mf-bars">॥${swastik}॥</span>`;
+
+  /* One "label : ______" blank of the paper form. `locked` shows `show` instead of an input. */
+  function blank(name, label, o = {}) {
+    const value = o.value !== undefined ? o.value : (m[name] ?? '');
+    const cls = `mf-f ${o.w || 'w-md'}${o.textarea ? ' mf-multi' : ''}`;
+    if (!edit || o.locked) {
+      const show = o.show !== undefined ? o.show : value;
+      return `<div class="${cls}"><span class="mf-l">${label}</span><span class="mf-v">${esc(show) || '&nbsp;'}</span></div>`;
+    }
+    const attrs = [
+      `name="${name}"`,
+      `id="mf-${name}"`,
+      `maxlength="${o.max || 60}"`,
+      o.numeric ? 'inputmode="numeric"' : '',
+      o.req && applicant ? 'required' : '',
+      o.autocomplete ? `autocomplete="${o.autocomplete}"` : '',
+      o.placeholder ? `placeholder="${esc(o.placeholder)}"` : '',
+    ].filter(Boolean).join(' ');
+    const input = o.textarea
+      ? `<textarea class="mf-in" ${attrs} rows="2">${esc(value)}</textarea>`
+      : `<input class="mf-in" type="${o.type || 'text'}" ${attrs} value="${esc(value)}">`;
+    const req = o.req && applicant ? '<b class="req">*</b>' : '';
+    return `<label class="${cls}" data-field="${name}"><span class="mf-l">${label}${req}</span>${input}<span class="field-error"></span></label>`;
+  }
+  const defaultValue = (k, fallback) => (m[k] ?? (applicant ? fallback : ''));
+%>
+<div class="mf-paper<%= edit ? ' mf-editing' : '' %>">
+  <div class="mf-top">
+    <span class="mf-om">॥ ॐ श्री गणेशाय नमः ॥</span>
+    <span class="mf-reg">रजि. नंबर : <%= site.reg_no %></span>
+  </div>
+  <div class="mf-brand">
+    <h2><%- bars %><span class="mf-org"><%= site.org_name %></span><%- bars %></h2>
+    <p class="mf-addr"><%= site.address %></p>
+    <% if (site.email) { %><p class="mf-contact">Email : <%= site.email %></p><% } %>
+    <% if (site.phone) { %><p class="mf-contact">Mob.: <%= site.phone %></p><% } %>
+  </div>
+  <div class="mf-titlebar"><span class="mf-title">❋ सदस्यता फॉर्म ❋</span></div>
+
+  <div class="mf-headgrid">
+    <ul class="mf-meta">
+      <li><span class="mf-l">क्रमसंख्या :</span> <span class="mf-v mf-inline"><%= m.application_no || (applicant ? 'फ़ॉर्म जमा करने पर मिलेगी' : '') %></span></li>
+      <li><span class="mf-l">दिनांक :</span> <span class="mf-v mf-inline"><%= dateText %></span></li>
+    </ul>
+    <% if (applicant) { %>
+      <div class="mf-photo-wrap" data-field="photo">
+        <label class="mf-photo" for="photo" id="photo-preview" title="फोटो लगाएँ">
+          <span>फोटो</span>
+          <small class="mf-noprint">यहाँ क्लिक करके<br>फोटो लगाएँ</small>
+        </label>
+        <input type="file" id="photo" name="photo" accept="image/jpeg,image/png,image/webp" hidden>
+        <span class="field-error"></span>
+      </div>
+    <% } else { %>
+      <div class="mf-photo"><% if (m.photo) { %><img src="<%= m.photo %>" alt="फोटो"><% } else { %><span>फोटो</span><% } %></div>
+    <% } %>
+  </div>
+
+  <div class="mf-row mf-numbered">
+    <span class="mf-no">१)</span>
+    <%- blank('name', 'सदस्य का नाम :', { w: 'w-lg', max: 80, req: true, autocomplete: 'name' }) %>
+    <%- blank('age', 'उम्र :', { w: 'w-xs', max: 3, numeric: true, req: true }) %>
+    <%- blank('aadhaar', 'आधार कार्ड नं. :', { w: 'w-md', max: 14, numeric: true, value: formatAadhaar(m.aadhaar), show: secure ? formatAadhaar(m.aadhaar) : maskAadhaar(m.aadhaar), locked: !secure }) %>
+  </div>
+  <div class="mf-row">
+    <%- blank('vansh', 'वंश :') %>
+    <%- blank('gotra', 'गोत्र :') %>
+  </div>
+  <div class="mf-row">
+    <%- blank('phone', 'मो. :', { type: 'tel', max: 14, numeric: true, req: true, autocomplete: 'tel', value: local10(m.phone), show: phoneOut(m.phone), locked: !secure }) %>
+    <%- blank('email', 'ईमेल :', { type: 'email', max: 120, autocomplete: 'email' }) %>
+  </div>
+  <div class="mf-row">
+    <%- blank('father_name', 'माता/ पिता या पति का नाम :', { w: 'w-full', max: 80, req: true }) %>
+  </div>
+
+  <div class="mf-row mf-numbered">
+    <span class="mf-no">२)</span>
+    <span class="mf-lead">स्थायी पता उत्तर प्रदेश का :-</span>
+    <%- blank('perm_village', 'ग्राम :', { req: true }) %>
+    <%- blank('perm_post', 'पोस्ट :', { w: 'w-sm' }) %>
+    <%- blank('perm_block', 'ब्लॉक :', { w: 'w-sm' }) %>
+  </div>
+  <div class="mf-row">
+    <%- blank('perm_tehsil', 'तहसील :') %>
+    <%- blank('perm_district', 'जिला :', { req: true }) %>
+    <%- blank('perm_pincode', 'पिनकोड :', { w: 'w-sm', max: 6, numeric: true }) %>
+  </div>
+
+  <div class="mf-row mf-numbered">
+    <span class="mf-no">३)</span>
+    <%- blank('address', 'वर्तमान पता :', { w: 'w-full', max: 300, textarea: true, req: true }) %>
+  </div>
+  <div class="mf-row">
+    <%- blank('ward_no', 'प्रभाग नंबर :', { max: 30 }) %>
+    <%- blank('vidhan_sabha', 'विधानसभा :') %>
+  </div>
+  <div class="mf-row">
+    <%- blank('district', 'जिला :', { w: 'w-sm', value: defaultValue('district', 'पुणे') }) %>
+    <%- blank('state', 'प्रदेश :', { w: 'w-sm', value: defaultValue('state', 'महाराष्ट्र') }) %>
+    <%- blank('country', 'राष्ट्र :', { w: 'w-sm', value: defaultValue('country', 'भारत') }) %>
+    <%- blank('pincode', 'पिनकोड :', { w: 'w-sm', max: 6, numeric: true }) %>
+  </div>
+
+  <div class="mf-row mf-numbered">
+    <span class="mf-no">४)</span>
+    <span class="mf-lead mf-para">पारिवारिक विवरण :- माता-पिता, पुत्र-पुत्री, भाई-बहन या परिवार में अन्य जो भी हो जिनकी जानकारी देना चाहें</span>
+  </div>
+  <% for (let i = 1; i <= FAMILY_ROWS; i++) { const r = family[i - 1] || {}; %>
+    <div class="mf-row mf-trow">
+      <%- blank(`family_${i}_name`, `${dn(i)} नाम :`, { w: 'w-lg', max: 80, value: r.name ?? '', locked: !secure }) %>
+      <%- blank(`family_${i}_age`, 'उम्र :', { w: 'w-xs', max: 3, numeric: true, value: r.age ?? '', locked: !secure }) %>
+      <%- blank(`family_${i}_relation`, 'संबंध :', { w: 'w-sm', max: 40, value: r.relation ?? '', locked: !secure }) %>
+      <%- blank(`family_${i}_phone`, 'मो.नं. :', { w: 'w-sm', type: 'tel', max: 14, numeric: true, value: local10(r.phone), show: r.phone ? phoneOut(r.phone) : '', locked: !secure }) %>
+    </div>
+  <% } %>
+
+  <div class="mf-row mf-numbered">
+    <span class="mf-no">५)</span>
+    <span class="mf-lead mf-para">आप अपने गाँव के रिलेशन की जानकारी जैसे कि चाचा, मामा, ससुराल या गाँव के किसी व्यक्ति की जानकारी संस्था को दें</span>
+  </div>
+  <% for (let i = 1; i <= RELATIVE_ROWS; i++) { const r = relatives[i - 1] || {}; %>
+    <div class="mf-row mf-trow">
+      <%- blank(`relative_${i}_name`, `${dn(i)} नाम :`, { w: 'w-md', max: 80, value: r.name ?? '', locked: !secure }) %>
+      <%- blank(`relative_${i}_age`, 'उम्र :', { w: 'w-xs', max: 3, numeric: true, value: r.age ?? '', locked: !secure }) %>
+      <%- blank(`relative_${i}_relation`, 'संबंध :', { w: 'w-sm', max: 40, value: r.relation ?? '', locked: !secure }) %>
+      <%- blank(`relative_${i}_address`, 'संक्षेप पता :', { w: 'w-md', max: 120, value: r.address ?? '', locked: !secure }) %>
+      <%- blank(`relative_${i}_phone`, 'मो. :', { w: 'w-sm', type: 'tel', max: 14, numeric: true, value: local10(r.phone), show: r.phone ? phoneOut(r.phone) : '', locked: !secure }) %>
+    </div>
+  <% } %>
+
+  <div class="mf-row mf-numbered">
+    <span class="mf-no">६)</span>
+    <span class="mf-lead">संकल्प/घोषणा</span>
+  </div>
+  <p class="mf-decl">मैं यह घोषित करता/करती हूँ कि मैंने सदस्यता फॉर्म में जो भी जानकारी प्रदान की है वह पूर्णतः सत्य, सही एवम् मेरी जानकारी के अनुसार है। इसमें दी गयी किसी भी जानकारी के सम्बन्ध में संपूर्ण उत्तरदायित्व मेरा स्वयं का होगा।</p>
+  <% if (applicant) { %>
+    <label class="mf-agree" data-field="declaration">
+      <input type="checkbox" name="declaration" id="declaration" value="1">
+      <span>मैं उपरोक्त घोषणा से सहमत हूँ <b class="req">*</b></span>
+      <span class="field-error"></span>
+    </label>
+  <% } %>
+
+  <div class="mf-signrow">
+    <div class="mf-sign" data-field="signature">
+      <span class="mf-l">हस्ताक्षर सदस्य :<% if (applicant) { %><b class="req">*</b><% } %></span>
+      <% if (applicant) { %>
+        <div class="sig-wrap" id="sig-wrap">
+          <canvas id="sig-canvas" aria-label="हस्ताक्षर करने का स्थान"></canvas>
+          <div class="sig-line"></div>
+          <div class="sig-placeholder"><%- icon('pen-tool') %>&nbsp; यहाँ उंगली या माउस से हस्ताक्षर करें</div>
+        </div>
+        <div class="sig-actions mf-noprint">
+          <span>मोबाइल पर उंगली से, कंप्यूटर पर माउस से</span>
+          <button class="btn btn-sm btn-outline" type="button" id="sig-clear"><%- icon('rotate-ccw') %> मिटाएँ</button>
+        </div>
+        <input type="hidden" name="signature" id="signature">
+        <span class="field-error"></span>
+      <% } else if (m.signature) { %>
+        <span class="mf-sigimg"><img src="/admin/private/<%= m.signature %>" alt="सदस्य के हस्ताक्षर"></span>
+      <% } else { %>
+        <span class="mf-v">&nbsp;</span>
+      <% } %>
+    </div>
+    <div class="mf-f w-sm"><span class="mf-l">दिनांक :</span><span class="mf-v"><%= dateText %></span></div>
+  </div>
+
+  <div class="mf-office<%= applicant ? ' is-blank' : '' %>">
+    <div class="mf-office-title">संस्था के पदाधिकारी के हस्ताक्षर<% if (applicant) { %> <small>(कार्यालय उपयोग हेतु — आवेदक न भरें)</small><% } %></div>
+    <div class="mf-sigs">
+      <div><b>अध्यक्ष –</b><span>नाम :</span></div>
+      <div><b>सचिव –</b><span>नाम :</span></div>
+      <div><b>कोषाध्यक्ष –</b><span>नाम :</span></div>
+      <div><b>मंडल अध्यक्ष (भाग– <%= applicant ? '' : (m.mandal_name || '') %> )</b><span>नाम :</span></div>
+      <div><b>कमिटी मेंबर –</b><span>नाम :</span></div>
+    </div>
+  </div>
+</div>

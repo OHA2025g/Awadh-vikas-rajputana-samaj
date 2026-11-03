@@ -1,0 +1,13 @@
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="पूर्वावलोकन" hidden>
+  <div class="lb-top">
+    <span class="lb-caption" data-lb-caption></span>
+    <span class="lb-counter" data-lb-counter></span>
+    <button class="lb-btn" type="button" data-lb-zoom title="ज़ूम (बड़ा करके पढ़ें)"><%- icon('search') %></button>
+    <a class="lb-btn" href="#" data-lb-open target="_blank" rel="noopener" title="नए टैब में खोलें"><%- icon('external-link') %></a>
+    <a class="lb-btn" href="#" data-lb-download title="डाउनलोड करें"><%- icon('download') %></a>
+    <button class="lb-btn" type="button" data-lb-close title="बंद करें (Esc)"><%- icon('x') %></button>
+  </div>
+  <button class="lb-nav prev" type="button" data-lb-prev aria-label="पिछला"><%- icon('chevron-left') %></button>
+  <div class="lb-stage" data-lb-stage></div>
+  <button class="lb-nav next" type="button" data-lb-next aria-label="अगला"><%- icon('chevron-right') %></button>
+</div>
