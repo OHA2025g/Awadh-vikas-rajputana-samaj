@@ -42,7 +42,7 @@ function buildWhere({ status, category, mandal, committee, q, publicOnly, ids, c
   }
   if (q) {
     where.push(
-      `(m.name LIKE @q ESCAPE '\\' OR m.name_en LIKE @q ESCAPE '\\' OR m.member_no LIKE @q ESCAPE '\\' OR m.city LIKE @q ESCAPE '\\' OR m.application_no LIKE @q ESCAPE '\\' OR m.designation LIKE @q ESCAPE '\\')`
+      `(m.name ILIKE @q ESCAPE E'\\\\' OR m.name_en ILIKE @q ESCAPE E'\\\\' OR m.member_no ILIKE @q ESCAPE E'\\\\' OR m.city ILIKE @q ESCAPE E'\\\\' OR m.application_no ILIKE @q ESCAPE E'\\\\' OR m.designation ILIKE @q ESCAPE E'\\\\')`
     );
     params.q = likeTerm(q);
   }
@@ -53,31 +53,31 @@ function buildWhere({ status, category, mandal, committee, q, publicOnly, ids, c
   return { sql: where.length ? `WHERE ${where.join(' AND ')}` : '', params };
 }
 
-export function listMembers(filters = {}, { limit = 50, offset = 0, order = 'category' } = {}) {
+export async function listMembers(filters = {}, { limit = 50, offset = 0, order = 'category' } = {}) {
   const { sql, params } = buildWhere(filters);
   const orderBy =
     order === 'recent'
       ? 'm.created_at DESC, m.id DESC'
-      : `${CATEGORY_ORDER}, m.sort_order, m.name COLLATE NOCASE`;
-  const total = db.prepare(`SELECT COUNT(*) AS n FROM members m ${sql}`).get(params).n;
-  const rows = db
+      : `${CATEGORY_ORDER}, m.sort_order, m.name`;
+  const total = (await db.prepare(`SELECT COUNT(*) AS n FROM members m ${sql}`).get(params)).n;
+  const rows = await db
     .prepare(`${BASE_SELECT} ${sql} ORDER BY ${orderBy} LIMIT @limit OFFSET @offset`)
     .all({ ...params, limit, offset });
   return { rows, total };
 }
 
-export function allMembers(filters = {}) {
+export async function allMembers(filters = {}) {
   const { sql, params } = buildWhere(filters);
-  return db.prepare(`${BASE_SELECT} ${sql} ORDER BY ${CATEGORY_ORDER}, m.sort_order, m.name COLLATE NOCASE`).all(params);
+  return await db.prepare(`${BASE_SELECT} ${sql} ORDER BY ${CATEGORY_ORDER}, m.sort_order, m.name`).all(params);
 }
 
-export function getMember(id) {
-  return db.prepare(`${BASE_SELECT} WHERE m.id = ?`).get(Number(id)) || null;
+export async function getMember(id) {
+  return (await db.prepare(`${BASE_SELECT} WHERE m.id = ?`).get(Number(id))) || null;
 }
 
-export function categoryCounts({ publicOnly = true, status } = {}) {
+export async function categoryCounts({ publicOnly = true, status } = {}) {
   const { sql, params } = buildWhere({ publicOnly, status });
-  const rows = db.prepare(`SELECT m.category AS k, COUNT(*) AS n FROM members m ${sql} GROUP BY m.category`).all(params);
+  const rows = await db.prepare(`SELECT m.category AS k, COUNT(*) AS n FROM members m ${sql} GROUP BY m.category`).all(params);
   const counts = { all: 0 };
   for (const key of CATEGORY_KEYS) counts[key] = 0;
   for (const r of rows) {
@@ -87,8 +87,8 @@ export function categoryCounts({ publicOnly = true, status } = {}) {
   return counts;
 }
 
-export function findActiveByPhone(phone) {
-  return db.prepare("SELECT id, status, application_no FROM members WHERE phone = ? AND status != 'rejected'").get(phone);
+export async function findActiveByPhone(phone) {
+  return await db.prepare("SELECT id, status, application_no FROM members WHERE phone = ? AND status != 'rejected'").get(phone);
 }
 
 /** Fields that are safe to show on the public website. */
@@ -109,18 +109,18 @@ export function toPublicMember(m) {
   };
 }
 
-export function approveMember(id, patch) {
-  return tx(() => {
-    const m = db.prepare('SELECT id, member_no FROM members WHERE id = ?').get(id);
+export async function approveMember(id, patch) {
+  return tx(async () => {
+    const m = await db.prepare('SELECT id, member_no FROM members WHERE id = ?').get(id);
     if (!m) return null;
     let memberNo = m.member_no;
     if (!memberNo) {
-      const prefix = getSite().member_prefix || 'M';
-      const n = (Number(getSetting('member_counter', 0)) || 0) + 1;
-      setSetting('member_counter', n);
+      const prefix = (await getSite()).member_prefix || 'M';
+      const n = (Number(await getSetting('member_counter', 0)) || 0) + 1;
+      await setSetting('member_counter', n);
       memberNo = `${prefix}-${String(n).padStart(4, '0')}`;
     }
-    db.prepare(
+    await db.prepare(
       `UPDATE members SET status = 'approved', member_no = @memberNo, category = @category, designation = @designation,
          mandal_id = @mandal_id, committee_id = @committee_id, show_in_directory = @show_in_directory,
          approved_at = COALESCE(approved_at, CURRENT_TIMESTAMP), reject_reason = NULL, updated_at = CURRENT_TIMESTAMP
@@ -135,17 +135,17 @@ export function nextApplicationNo(id) {
 }
 
 /** Records a certificate print for each approved member; returns how many were marked. */
-export function markCertificatesPrinted(ids, adminId) {
+export async function markCertificatesPrinted(ids, adminId) {
   const find = db.prepare("SELECT id, cert_serial FROM members WHERE id = ? AND status = 'approved'");
   const bump = db.prepare('UPDATE members SET cert_printed_at = CURRENT_TIMESTAMP, cert_print_count = cert_print_count + 1 WHERE id = ?');
   const log = db.prepare('INSERT INTO certificate_log (member_id, serial, admin_id) VALUES (?, ?, ?)');
-  return tx(() => {
+  return tx(async () => {
     let n = 0;
     for (const id of ids) {
-      const m = find.get(id);
+      const m = await find.get(id);
       if (!m) continue;
-      bump.run(m.id);
-      log.run(m.id, m.cert_serial, adminId);
+      await bump.run(m.id);
+      await log.run(m.id, m.cert_serial, adminId);
       n += 1;
     }
     return n;
@@ -153,7 +153,11 @@ export function markCertificatesPrinted(ids, adminId) {
 }
 
 /** Clears the printed status, e.g. after a misprint that has to be redone. */
-export function clearCertificatesPrinted(ids) {
+export async function clearCertificatesPrinted(ids) {
   const clear = db.prepare("UPDATE members SET cert_printed_at = NULL, cert_print_count = 0 WHERE id = ? AND status = 'approved'");
-  return tx(() => ids.reduce((n, id) => n + clear.run(id).changes, 0));
+  return tx(async () => {
+    let n = 0;
+    for (const id of ids) n += (await clear.run(id)).changes;
+    return n;
+  });
 }

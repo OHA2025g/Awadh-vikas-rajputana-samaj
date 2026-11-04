@@ -1,12 +1,9 @@
 # Production image for EasyPanel (and any Docker host).
-# Mount a volume at /app/data so the SQLite database, uploads and WhatsApp session survive rebuilds.
+# Attach a Postgres service via DATABASE_URL. Mount a volume at /app/data for uploads
+# and the WhatsApp session (not the database).
 
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
-  && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
@@ -14,9 +11,8 @@ RUN npm ci --omit=dev
 FROM node:20-bookworm-slim
 WORKDIR /app
 
-# better-sqlite3's compiled addon needs libstdc++
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends libstdc++6 ca-certificates \
+  && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/node_modules ./node_modules
@@ -34,5 +30,4 @@ ENV DATA_DIR=/app/data
 EXPOSE 3000
 
 # Run as root so an EasyPanel volume mounted on /app/data is writable.
-# Replicas must stay at 1 — SQLite is a single-writer database.
 CMD ["node", "server.js"]

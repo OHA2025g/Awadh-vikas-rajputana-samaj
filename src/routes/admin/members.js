@@ -32,8 +32,8 @@ import {
 
 const router = express.Router();
 
-const mandals = () => db.prepare('SELECT * FROM mandals ORDER BY sort_order, id').all();
-const committees = () => db.prepare('SELECT * FROM committees ORDER BY sort_order, id').all();
+const mandals = async () => await db.prepare('SELECT * FROM mandals ORDER BY sort_order, id').all();
+const committees = async () => await db.prepare('SELECT * FROM committees ORDER BY sort_order, id').all();
 
 function filtersFrom(query, defaults = {}) {
   return {
@@ -48,7 +48,7 @@ function filtersFrom(query, defaults = {}) {
 
 /* ---------- Private files (applicant signatures) ---------- */
 
-router.get('/private/:file', (req, res, next) => {
+router.get('/private/:file', async (req, res, next) => {
   const file = privatePath(req.params.file);
   if (!file) return next();
   res.set('Cache-Control', 'private, max-age=3600');
@@ -57,46 +57,46 @@ router.get('/private/:file', (req, res, next) => {
 
 /* ---------- Applications ---------- */
 
-router.get('/applications', (req, res) => {
+router.get('/applications', async (req, res) => {
   const status = req.query.status === 'rejected' ? 'rejected' : 'pending';
-  const { rows } = listMembers({ status }, { limit: 500, order: 'recent' });
+  const { rows } = await listMembers({ status }, { limit: 500, order: 'recent' });
   res.render('admin/applications', { pageTitle: 'सदस्यता आवेदन', rows, status });
 });
 
-router.get('/applications/:id', (req, res, next) => {
-  const m = getMember(req.params.id);
+router.get('/applications/:id', async (req, res, next) => {
+  const m = await getMember(req.params.id);
   if (!m) return next();
   res.render('admin/application', {
     pageTitle: `आवेदन ${m.application_no || ''}`,
     extraStyles: ['/css/membership-form.css'],
     m,
     formDate: formatDate(m.created_at, 'numeric'),
-    mandals: mandals(),
-    committees: committees(),
+    mandals: await mandals(),
+    committees: await committees(),
   });
 });
 
 /** The filled-in सदस्यता फॉर्म on its own page, for printing on A4. */
-router.get('/members/:id/form', (req, res, next) => {
-  const m = getMember(req.params.id);
+router.get('/members/:id/form', async (req, res, next) => {
+  const m = await getMember(req.params.id);
   if (!m) return next();
   res.render('admin/form-print', { m, formDate: formatDate(m.created_at, 'numeric') });
 });
 
-router.post('/applications/:id/approve', (req, res) => {
+router.post('/applications/:id/approve', async (req, res) => {
   const id = int(req.params.id);
   const b = req.body ?? {};
-  const m = getMember(id);
+  const m = await getMember(id);
   const has = (k) => b[k] !== undefined;
   const memberNo =
     m &&
-    approveMember(id, {
+    (await approveMember(id, {
       category: CATEGORY_KEYS.includes(b.category) ? b.category : m.category || 'sadasya',
       designation: has('designation') ? str(b.designation, 80) || null : m.designation,
       mandal_id: has('mandal_id') ? int(b.mandal_id) : m.mandal_id,
       committee_id: has('committee_id') ? int(b.committee_id) : m.committee_id,
       show_in_directory: has('show_in_directory') || has('category') ? bool(b.show_in_directory) : 1,
-    });
+    }));
   if (!memberNo) {
     flash(req, 'error', 'आवेदन नहीं मिला।');
   } else {
@@ -105,8 +105,8 @@ router.post('/applications/:id/approve', (req, res) => {
   res.redirect(b.back === 'list' ? '/admin/applications' : `/admin/members/${id}/edit`);
 });
 
-router.post('/applications/:id/reject', (req, res) => {
-  db.prepare("UPDATE members SET status = 'rejected', reject_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(
+router.post('/applications/:id/reject', async (req, res) => {
+  await db.prepare("UPDATE members SET status = 'rejected', reject_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(
     str(req.body?.reason, 300) || null,
     int(req.params.id)
   );
@@ -116,11 +116,11 @@ router.post('/applications/:id/reject', (req, res) => {
 
 /* ---------- Members list ---------- */
 
-router.get('/members', (req, res) => {
+router.get('/members', async (req, res) => {
   const filters = filtersFrom(req.query);
-  const { total } = listMembers(filters, { limit: 0 });
+  const { total } = await listMembers(filters, { limit: 0 });
   const pg = paginate(total, int(req.query.page, 1), 50);
-  const { rows } = listMembers(filters, { limit: pg.perPage, offset: pg.offset });
+  const { rows } = await listMembers(filters, { limit: pg.perPage, offset: pg.offset });
   const qs = new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== '' && v != null)).toString();
   res.render('admin/members', {
     pageTitle: 'सदस्य सूची',
@@ -128,9 +128,9 @@ router.get('/members', (req, res) => {
     filters,
     pg,
     qs,
-    mandals: mandals(),
-    committees: committees(),
-    counts: categoryCounts({ publicOnly: false, status: filters.status }),
+    mandals: await mandals(),
+    committees: await committees(),
+    counts: await categoryCounts({ publicOnly: false, status: filters.status }),
   });
 });
 
@@ -169,14 +169,14 @@ function parseMember(body, isSuper) {
   return { v, errors };
 }
 
-function renderForm(res, m, extra = {}) {
+async function renderForm(res, m, extra = {}) {
   res.render('admin/member-form', {
     pageTitle: m.id ? `सदस्य संपादन — ${m.name}` : 'नया सदस्य जोड़ें',
     extraStyles: ['/css/membership-form.css'],
     m,
     formDate: formatDate(m.created_at || new Date(), 'numeric'),
-    mandals: mandals(),
-    committees: committees(),
+    mandals: await mandals(),
+    committees: await committees(),
     SALUTATIONS,
     GENDERS,
     errors: [],
@@ -184,39 +184,39 @@ function renderForm(res, m, extra = {}) {
   });
 }
 
-router.get('/members/new', requireSuper, (req, res) => {
-  renderForm(res, { status: 'approved', category: 'sadasya', show_in_directory: 1, sort_order: 0 });
+router.get('/members/new', requireSuper, async (req, res) => {
+  await renderForm(res, { status: 'approved', category: 'sadasya', show_in_directory: 1, sort_order: 0 });
 });
 
-router.post('/members', requireSuper, (req, res) => {
+router.post('/members', requireSuper, async (req, res) => {
   const { v, errors } = parseMember(req.body ?? {}, true);
-  if (v.phone && db.prepare("SELECT 1 FROM members WHERE phone = ? AND status != 'rejected'").get(v.phone)) {
+  if (v.phone && await db.prepare("SELECT 1 FROM members WHERE phone = ? AND status != 'rejected'").get(v.phone)) {
     errors.push('इस मोबाइल नंबर से सदस्य पहले से मौजूद है।');
   }
-  if (errors.length) return renderForm(res, { ...v, ...req.body, id: null }, { errors });
+  if (errors.length) return await renderForm(res, { ...v, ...req.body, id: null }, { errors });
   const photoFile = fileFor(req, 'photo');
   const photo = photoFile ? saveImage(photoFile.buffer) : null;
-  const id = tx(() => {
+  const id = await tx(async () => {
     const row = { ...v, photo };
     const cols = Object.keys(row);
-    const info = db
+    const info = await db
       .prepare(`INSERT INTO members (status, ${cols.join(', ')}) VALUES ('pending', ${cols.map((c) => `@${c}`).join(', ')})`)
       .run(row);
     const newId = info.lastInsertRowid;
-    db.prepare('UPDATE members SET application_no = ? WHERE id = ?').run(nextApplicationNo(newId), newId);
-    approveMember(newId, v);
+    await db.prepare('UPDATE members SET application_no = ? WHERE id = ?').run(nextApplicationNo(newId), newId);
+    await approveMember(newId, v);
     return newId;
   });
   flash(req, 'success', 'नया सदस्य जोड़ा गया।');
   res.redirect(`/admin/members/${id}/edit`);
 });
 
-router.post('/members/bulk', (req, res) => {
+router.post('/members/bulk', async (req, res) => {
   const body = req.body ?? {};
   const qs = String(body.qs || '').replace(/[^\w=&%.+-]/g, '');
   const ids =
     body.all_matching === '1'
-      ? allMembers(filtersFrom(Object.fromEntries(new URLSearchParams(qs)))).map((m) => m.id)
+      ? (await allMembers(filtersFrom(Object.fromEntries(new URLSearchParams(qs))))).map((m) => m.id)
       : [].concat(body.ids || []).map(Number).filter(Number.isInteger);
   const back = `/admin/members${qs ? `?${qs}` : ''}`;
   if (!ids.length) {
@@ -227,36 +227,36 @@ router.post('/members/bulk', (req, res) => {
   switch (body.action) {
     case 'category':
       if (CATEGORY_KEYS.includes(body.category)) {
-        db.prepare(`UPDATE members SET category = ? WHERE id IN (${placeholders})`).run(body.category, ...ids);
+        await db.prepare(`UPDATE members SET category = ? WHERE id IN (${placeholders})`).run(body.category, ...ids);
         flash(req, 'success', `${ids.length} सदस्यों की श्रेणी "${CATEGORY_LABEL[body.category]}" की गई।`);
       }
       break;
     case 'mandal': {
       const mandalId = int(body.mandal_id);
       if (mandalId) {
-        db.prepare(`UPDATE members SET mandal_id = ? WHERE id IN (${placeholders})`).run(mandalId, ...ids);
+        await db.prepare(`UPDATE members SET mandal_id = ? WHERE id IN (${placeholders})`).run(mandalId, ...ids);
         flash(req, 'success', `${ids.length} सदस्यों का मंडल बदला गया।`);
       }
       break;
     }
     case 'hide':
     case 'show':
-      db.prepare(`UPDATE members SET show_in_directory = ? WHERE id IN (${placeholders})`).run(body.action === 'show' ? 1 : 0, ...ids);
+      await db.prepare(`UPDATE members SET show_in_directory = ? WHERE id IN (${placeholders})`).run(body.action === 'show' ? 1 : 0, ...ids);
       flash(req, 'success', 'निर्देशिका दृश्यता अपडेट की गई।');
       break;
     case 'cert_printed':
-      flash(req, 'success', `${markCertificatesPrinted(ids, req.admin.id)} सदस्यों का प्रमाण पत्र "छपा" चिह्नित किया गया।`);
+      flash(req, 'success', `${await markCertificatesPrinted(ids, req.admin.id)} सदस्यों का प्रमाण पत्र "छपा" चिह्नित किया गया।`);
       break;
     case 'cert_unprinted':
-      flash(req, 'success', `${clearCertificatesPrinted(ids)} सदस्यों का प्रमाण पत्र "नहीं छपा" चिह्नित किया गया।`);
+      flash(req, 'success', `${await clearCertificatesPrinted(ids)} सदस्यों का प्रमाण पत्र "नहीं छपा" चिह्नित किया गया।`);
       break;
     case 'delete': {
       if (req.admin.role !== 'superadmin') {
         flash(req, 'error', 'सदस्य हटाने का अधिकार केवल मुख्य एडमिन को है।');
         break;
       }
-      const files = db.prepare(`SELECT photo, signature FROM members WHERE id IN (${placeholders})`).all(...ids);
-      db.prepare(`DELETE FROM members WHERE id IN (${placeholders})`).run(...ids);
+      const files = await db.prepare(`SELECT photo, signature FROM members WHERE id IN (${placeholders})`).all(...ids);
+      await db.prepare(`DELETE FROM members WHERE id IN (${placeholders})`).run(...ids);
       for (const f of files) {
         removeUpload(f.photo);
         removeUpload(f.signature);
@@ -270,30 +270,30 @@ router.post('/members/bulk', (req, res) => {
   res.redirect(back);
 });
 
-router.get('/members/:id/edit', (req, res, next) => {
-  const m = getMember(req.params.id);
+router.get('/members/:id/edit', async (req, res, next) => {
+  const m = await getMember(req.params.id);
   if (!m) return next();
-  const certLog = db
+  const certLog = await db
     .prepare(
       'SELECT l.*, a.name AS admin_name FROM certificate_log l LEFT JOIN admins a ON a.id = l.admin_id WHERE l.member_id = ? ORDER BY l.id DESC LIMIT 10'
     )
     .all(m.id);
-  renderForm(res, m, { certLog });
+  await renderForm(res, m, { certLog });
 });
 
-router.post('/members/:id', (req, res, next) => {
-  const existing = getMember(req.params.id);
+router.post('/members/:id', async (req, res, next) => {
+  const existing = await getMember(req.params.id);
   if (!existing) return next();
   const isSuper = req.admin.role === 'superadmin';
   const body = req.body ?? {};
   const { v, errors } = parseMember(body, isSuper);
   if (isSuper) {
-    const dup = db
+    const dup = await db
       .prepare("SELECT 1 FROM members WHERE phone = ? AND id != ? AND status != 'rejected'")
       .get(v.phone, existing.id);
     if (dup) errors.push('यह मोबाइल नंबर किसी अन्य सदस्य के नाम पर है।');
   }
-  if (errors.length) return renderForm(res, { ...existing, ...v }, { errors });
+  if (errors.length) return await renderForm(res, { ...existing, ...v }, { errors });
 
   let photo = existing.photo;
   const photoFile = fileFor(req, 'photo');
@@ -306,24 +306,24 @@ router.post('/members/:id', (req, res, next) => {
   }
 
   const fields = Object.keys(v);
-  db.prepare(
+  await db.prepare(
     `UPDATE members SET ${fields.map((f) => `${f} = @${f}`).join(', ')}, photo = @photo, updated_at = CURRENT_TIMESTAMP WHERE id = @id`
   ).run({ ...v, photo, id: existing.id });
 
   if (body.status && body.status !== existing.status) {
-    if (body.status === 'approved') approveMember(existing.id, { ...v });
+    if (body.status === 'approved') await approveMember(existing.id, { ...v });
     else if (['pending', 'rejected'].includes(body.status)) {
-      db.prepare('UPDATE members SET status = ? WHERE id = ?').run(body.status, existing.id);
+      await db.prepare('UPDATE members SET status = ? WHERE id = ?').run(body.status, existing.id);
     }
   }
   flash(req, 'success', 'सदस्य की जानकारी सहेजी गई।');
   res.redirect(`/admin/members/${existing.id}/edit`);
 });
 
-router.post('/members/:id/delete', requireSuper, (req, res) => {
-  const m = getMember(req.params.id);
+router.post('/members/:id/delete', requireSuper, async (req, res) => {
+  const m = await getMember(req.params.id);
   if (m) {
-    db.prepare('DELETE FROM members WHERE id = ?').run(m.id);
+    await db.prepare('DELETE FROM members WHERE id = ?').run(m.id);
     removeUpload(m.photo);
     removeUpload(m.signature);
     flash(req, 'success', `${m.name} को हटा दिया गया।`);
@@ -377,14 +377,14 @@ const EXPORT_COLUMNS = [
   ['approved_on', 'स्वीकृति तिथि'],
 ];
 
-function exportRows(req) {
+async function exportRows(req) {
   const isSuper = req.admin.role === 'superadmin';
   const phoneOut = isSuper ? formatPhone : maskPhone;
   const rowsOut = (json) =>
     formRows(json)
       .map((r) => [r.name, r.relation, r.age && `${r.age} वर्ष`, r.address, r.phone && phoneOut(r.phone)].filter(Boolean).join(', '))
       .join(' | ');
-  return allMembers(filtersFrom(req.query)).map((m) => ({
+  return (await allMembers(filtersFrom(req.query))).map((m) => ({
     ...m,
     category_label: CATEGORY_LABEL[m.category],
     status_label: STATUS_LABEL[m.status],
@@ -398,8 +398,8 @@ function exportRows(req) {
   }));
 }
 
-router.get('/members/export.csv', (req, res) => {
-  const rows = exportRows(req);
+router.get('/members/export.csv', async (req, res) => {
+  const rows = await exportRows(req);
   const lines = [EXPORT_COLUMNS.map(([, label]) => csvCell(label)).join(',')];
   for (const r of rows) lines.push(EXPORT_COLUMNS.map(([key]) => csvCell(r[key])).join(','));
   res.set('Content-Type', 'text/csv; charset=utf-8');
@@ -408,7 +408,7 @@ router.get('/members/export.csv', (req, res) => {
 });
 
 router.get('/members/export.xlsx', async (req, res) => {
-  const rows = exportRows(req);
+  const rows = await exportRows(req);
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Awadh Rajput Vikas Sangh';
   const ws = wb.addWorksheet('सदस्य');

@@ -9,12 +9,12 @@ const router = express.Router();
 
 /* ---------- Authorised signatures (अध्यक्ष / सचिव) ---------- */
 
-router.get('/signatures', (req, res) => {
-  const signatures = db.prepare('SELECT * FROM signatures ORDER BY is_default DESC, id').all();
+router.get('/signatures', async (req, res) => {
+  const signatures = await db.prepare('SELECT * FROM signatures ORDER BY is_default DESC, id').all();
   res.render('admin/signatures', { pageTitle: 'अधिकृत हस्ताक्षर', signatures });
 });
 
-router.post('/signatures', (req, res) => {
+router.post('/signatures', async (req, res) => {
   const body = req.body ?? {};
   const label = str(body.label, 60);
   if (!label) {
@@ -35,9 +35,9 @@ router.post('/signatures', (req, res) => {
     flash(req, 'error', 'कृपया हस्ताक्षर की फ़ोटो अपलोड करें या बॉक्स में हस्ताक्षर करें।');
     return res.redirect('/admin/signatures');
   }
-  tx(() => {
-    const isFirst = db.prepare('SELECT COUNT(*) AS n FROM signatures').get().n === 0;
-    db.prepare('INSERT INTO signatures (label, signer_name, file, is_default) VALUES (?, ?, ?, ?)').run(
+  await tx(async () => {
+    const isFirst = (await db.prepare('SELECT COUNT(*) AS n FROM signatures').get()).n === 0;
+    await db.prepare('INSERT INTO signatures (label, signer_name, file, is_default) VALUES (?, ?, ?, ?)').run(
       label,
       str(body.signer_name, 80) || null,
       file,
@@ -48,19 +48,19 @@ router.post('/signatures', (req, res) => {
   res.redirect('/admin/signatures');
 });
 
-router.post('/signatures/:id/default', (req, res) => {
-  tx(() => {
-    db.prepare('UPDATE signatures SET is_default = 0').run();
-    db.prepare('UPDATE signatures SET is_default = 1 WHERE id = ?').run(int(req.params.id, 0));
+router.post('/signatures/:id/default', async (req, res) => {
+  await tx(async () => {
+    await db.prepare('UPDATE signatures SET is_default = 0').run();
+    await db.prepare('UPDATE signatures SET is_default = 1 WHERE id = ?').run(int(req.params.id, 0));
   });
   flash(req, 'success', 'डिफ़ॉल्ट हस्ताक्षर बदला गया।');
   res.redirect('/admin/signatures');
 });
 
-router.post('/signatures/:id/delete', (req, res) => {
-  const sig = db.prepare('SELECT * FROM signatures WHERE id = ?').get(int(req.params.id, 0));
+router.post('/signatures/:id/delete', async (req, res) => {
+  const sig = await db.prepare('SELECT * FROM signatures WHERE id = ?').get(int(req.params.id, 0));
   if (sig) {
-    db.prepare('DELETE FROM signatures WHERE id = ?').run(sig.id);
+    await db.prepare('DELETE FROM signatures WHERE id = ?').run(sig.id);
     removeUpload(sig.file);
     flash(req, 'success', 'हस्ताक्षर हटाया गया।');
   }
@@ -69,12 +69,12 @@ router.post('/signatures/:id/delete', (req, res) => {
 
 /* ---------- Admin users ---------- */
 
-router.get('/users', requireSuper, (req, res) => {
-  const users = db.prepare('SELECT id, username, name, role, created_at, last_login_at FROM admins ORDER BY id').all();
+router.get('/users', requireSuper, async (req, res) => {
+  const users = await db.prepare('SELECT id, username, name, role, created_at, last_login_at FROM admins ORDER BY id').all();
   res.render('admin/users', { pageTitle: 'एडमिन उपयोगकर्ता', users });
 });
 
-router.post('/users', requireSuper, (req, res) => {
+router.post('/users', requireSuper, async (req, res) => {
   const body = req.body ?? {};
   const username = str(body.username, 40).toLowerCase();
   const password = String(body.password || '');
@@ -82,10 +82,10 @@ router.post('/users', requireSuper, (req, res) => {
     flash(req, 'error', 'उपयोगकर्ता नाम में केवल अंग्रेज़ी अक्षर, अंक, _ . - (कम से कम 3) हों।');
   } else if (password.length < 8) {
     flash(req, 'error', 'पासवर्ड कम से कम 8 अक्षरों का हो।');
-  } else if (db.prepare('SELECT 1 FROM admins WHERE username = ?').get(username)) {
+  } else if (await db.prepare('SELECT 1 FROM admins WHERE username = ?').get(username)) {
     flash(req, 'error', 'यह उपयोगकर्ता नाम पहले से मौजूद है।');
   } else {
-    db.prepare('INSERT INTO admins (username, name, password_hash, role, must_change_password) VALUES (?, ?, ?, ?, 1)').run(
+    await db.prepare('INSERT INTO admins (username, name, password_hash, role, must_change_password) VALUES (?, ?, ?, ?, 1)').run(
       username,
       str(body.name, 80) || username,
       bcrypt.hashSync(password, 10),
@@ -96,23 +96,23 @@ router.post('/users', requireSuper, (req, res) => {
   res.redirect('/admin/users');
 });
 
-router.post('/users/:id/delete', requireSuper, (req, res) => {
+router.post('/users/:id/delete', requireSuper, async (req, res) => {
   const id = int(req.params.id, 0);
   if (id === req.admin.id) {
     flash(req, 'error', 'आप स्वयं को नहीं हटा सकते।');
   } else {
-    db.prepare('DELETE FROM admins WHERE id = ?').run(id);
+    await db.prepare('DELETE FROM admins WHERE id = ?').run(id);
     flash(req, 'success', 'एडमिन हटाया गया।');
   }
   res.redirect('/admin/users');
 });
 
-router.post('/users/:id/reset', requireSuper, (req, res) => {
+router.post('/users/:id/reset', requireSuper, async (req, res) => {
   const password = String(req.body?.password || '');
   if (password.length < 8) {
     flash(req, 'error', 'नया पासवर्ड कम से कम 8 अक्षरों का हो।');
   } else {
-    db.prepare('UPDATE admins SET password_hash = ?, must_change_password = 1 WHERE id = ?').run(
+    await db.prepare('UPDATE admins SET password_hash = ?, must_change_password = 1 WHERE id = ?').run(
       bcrypt.hashSync(password, 10),
       int(req.params.id, 0)
     );
@@ -123,13 +123,13 @@ router.post('/users/:id/reset', requireSuper, (req, res) => {
 
 /* ---------- Own password ---------- */
 
-router.get('/password', (req, res) => {
+router.get('/password', async (req, res) => {
   res.render('admin/password', { pageTitle: 'पासवर्ड बदलें', error: null });
 });
 
-router.post('/password', (req, res) => {
+router.post('/password', async (req, res) => {
   const body = req.body ?? {};
-  const admin = db.prepare('SELECT * FROM admins WHERE id = ?').get(req.admin.id);
+  const admin = await db.prepare('SELECT * FROM admins WHERE id = ?').get(req.admin.id);
   const next = String(body.new_password || '');
   let error = null;
   if (!bcrypt.compareSync(String(body.current_password || ''), admin.password_hash)) error = 'वर्तमान पासवर्ड गलत है।';
@@ -137,7 +137,7 @@ router.post('/password', (req, res) => {
   else if (next !== body.confirm_password) error = 'दोनों नए पासवर्ड मेल नहीं खाते।';
   else if (bcrypt.compareSync(next, admin.password_hash)) error = 'नया पासवर्ड पुराने से अलग होना चाहिए।';
   if (error) return res.status(422).render('admin/password', { pageTitle: 'पासवर्ड बदलें', error });
-  db.prepare('UPDATE admins SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(bcrypt.hashSync(next, 10), admin.id);
+  await db.prepare('UPDATE admins SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(bcrypt.hashSync(next, 10), admin.id);
   flash(req, 'success', 'पासवर्ड सफलतापूर्वक बदला गया।');
   res.redirect('/admin');
 });

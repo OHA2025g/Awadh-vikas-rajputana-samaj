@@ -34,30 +34,30 @@ function visitorId(req) {
 
 /* ---------- Home ---------- */
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const today = todayISO();
-  const sections = db.prepare('SELECT * FROM sections WHERE visible = 1 AND show_on_home = 1 ORDER BY sort_order, id').all();
-  const people = db.prepare('SELECT * FROM people WHERE visible = 1 ORDER BY sort_order, id').all();
-  const programs = db.prepare('SELECT * FROM programs WHERE visible = 1 ORDER BY sort_order, id').all();
-  const upcoming = db
+  const sections = await db.prepare('SELECT * FROM sections WHERE visible = 1 AND show_on_home = 1 ORDER BY sort_order, id').all();
+  const people = await db.prepare('SELECT * FROM people WHERE visible = 1 ORDER BY sort_order, id').all();
+  const programs = await db.prepare('SELECT * FROM programs WHERE visible = 1 ORDER BY sort_order, id').all();
+  const upcoming = await db
     .prepare('SELECT * FROM events WHERE visible = 1 AND event_date >= ? ORDER BY event_date ASC LIMIT 3')
     .all(today);
-  const past = db
+  const past = await db
     .prepare('SELECT * FROM events WHERE visible = 1 AND (event_date < ? OR event_date IS NULL) ORDER BY event_date DESC LIMIT 3')
     .all(today);
-  const posts = db
+  const posts = await db
     .prepare(
       `SELECT p.*, (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 'published') AS comment_count
        FROM posts p WHERE p.status = 'published' ORDER BY p.pinned DESC, p.created_at DESC LIMIT 3`
     )
     .all();
-  const counts = categoryCounts({ publicOnly: true });
-  const featured = listMembers({ publicOnly: true, category: 'pramukh' }, { limit: 4 }).rows.map(toPublicMember);
+  const counts = await categoryCounts({ publicOnly: true });
+  const featured = (await listMembers({ publicOnly: true, category: 'pramukh' }, { limit: 4 })).rows.map(toPublicMember);
   const stats = {
     members: counts.all,
-    mandals: db.prepare('SELECT COUNT(*) AS n FROM mandals').get().n,
-    committees: db.prepare('SELECT COUNT(*) AS n FROM committees').get().n,
-    events: db.prepare('SELECT COUNT(*) AS n FROM events WHERE visible = 1').get().n,
+    mandals: (await db.prepare('SELECT COUNT(*) AS n FROM mandals').get()).n,
+    committees: (await db.prepare('SELECT COUNT(*) AS n FROM committees').get()).n,
+    events: (await db.prepare('SELECT COUNT(*) AS n FROM events WHERE visible = 1').get()).n,
   };
   res.render('public/home', {
     sections,
@@ -69,18 +69,18 @@ router.get('/', (req, res) => {
     counts,
     featured,
     stats,
-    mandals: mandalsStmt.all(),
+    mandals: await mandalsStmt.all(),
   });
 });
 
 /* ---------- Directory ---------- */
 
-router.get('/directory', (req, res) => {
+router.get('/directory', async (req, res) => {
   res.render('public/directory', {
     pageTitle: 'सदस्य निर्देशिका',
-    mandals: mandalsStmt.all(),
-    committees: committeesStmt.all(),
-    counts: categoryCounts({ publicOnly: true }),
+    mandals: await mandalsStmt.all(),
+    committees: await committeesStmt.all(),
+    counts: await categoryCounts({ publicOnly: true }),
     initialCategory: ['pramukh', 'padadhikari', 'sadasya'].includes(req.query.category) ? req.query.category : '',
   });
 });
@@ -101,12 +101,12 @@ function toPublicDonation(d) {
   };
 }
 
-router.get('/donations', (req, res) => {
+router.get('/donations', async (req, res) => {
   const filters = donationFilters({ category: req.query.category, q: req.query.q });
   filters.category ||= DONATION_CATEGORIES[0].key;
-  const totals = donationTotals({ q: filters.q }, { isPublic: true });
+  const totals = await donationTotals({ q: filters.q }, { isPublic: true });
   const pg = paginate(totals[filters.category].n, int(req.query.page), DONATIONS_PER_PAGE);
-  const { rows } = listDonations(filters, { limit: DONATIONS_PER_PAGE, offset: pg.offset, isPublic: true });
+  const { rows } = await listDonations(filters, { limit: DONATIONS_PER_PAGE, offset: pg.offset, isPublic: true });
   res.render('public/donations', {
     pageTitle: 'दान एवं सहयोग',
     filters,
@@ -118,7 +118,7 @@ router.get('/donations', (req, res) => {
 
 /* ---------- Membership application ---------- */
 
-router.get('/join', (req, res) => {
+router.get('/join', async (req, res) => {
   res.render('public/join', {
     pageTitle: 'सदस्यता फॉर्म',
     extraStyles: ['/css/membership-form.css'],
@@ -136,13 +136,13 @@ function validateApplication(body) {
   return { v, errors };
 }
 
-router.post('/join', joinLimiter, publicUpload.single('photo'), (req, res) => {
+router.post('/join', joinLimiter, publicUpload.single('photo'), async (req, res) => {
   const body = req.body ?? {};
   if (body.website) return res.json({ ok: true, application_no: '—' });
 
   const { v, errors } = validateApplication(body);
   if (!errors.phone && v.phone) {
-    const existing = findActiveByPhone(v.phone);
+    const existing = await findActiveByPhone(v.phone);
     if (existing) {
       errors.phone =
         existing.status === 'approved'
@@ -164,28 +164,28 @@ router.post('/join', joinLimiter, publicUpload.single('photo'), (req, res) => {
 
   const row = { ...v, photo, signature };
   const cols = Object.keys(row);
-  const info = db
+  const info = await db
     .prepare(
       `INSERT INTO members (status, category, ${cols.join(', ')}) VALUES ('pending', 'sadasya', ${cols.map((c) => `@${c}`).join(', ')})`
     )
     .run(row);
   const applicationNo = nextApplicationNo(info.lastInsertRowid);
-  db.prepare('UPDATE members SET application_no = ? WHERE id = ?').run(applicationNo, info.lastInsertRowid);
+  await db.prepare('UPDATE members SET application_no = ? WHERE id = ?').run(applicationNo, info.lastInsertRowid);
   res.json({ ok: true, application_no: applicationNo, name: v.name });
 });
 
 /* ---------- Application status ---------- */
 
-router.get('/status', (req, res) => {
+router.get('/status', async (req, res) => {
   res.render('public/status', { pageTitle: 'आवेदन की स्थिति', result: null, query: {} });
 });
 
-router.post('/status', statusLimiter, (req, res) => {
+router.post('/status', statusLimiter, async (req, res) => {
   const appNo = str(req.body?.application_no, 20).toUpperCase();
   const phone = normalizePhone(req.body?.phone);
   const m =
     appNo && phone
-      ? db
+      ? await db
           .prepare('SELECT name, status, member_no, application_no, reject_reason, created_at FROM members WHERE application_no = ? AND phone = ?')
           .get(appNo, phone)
       : null;
@@ -198,12 +198,12 @@ router.post('/status', statusLimiter, (req, res) => {
 
 /* ---------- Community wall ---------- */
 
-router.get('/wall', (req, res) => {
+router.get('/wall', async (req, res) => {
   const cat = POST_CATEGORIES.some((c) => c.key === req.query.cat) ? req.query.cat : '';
   const where = `p.status = 'published'${cat ? ' AND p.category = @cat' : ''}`;
-  const total = db.prepare(`SELECT COUNT(*) AS n FROM posts p WHERE ${where}`).get({ cat }).n;
+  const total = (await db.prepare(`SELECT COUNT(*) AS n FROM posts p WHERE ${where}`).get({ cat })).n;
   const pg = paginate(total, int(req.query.page, 1), 10);
-  const posts = db
+  const posts = await db
     .prepare(
       `SELECT p.*, m.photo AS member_photo FROM posts p LEFT JOIN members m ON m.id = p.member_id
        WHERE ${where} ORDER BY p.pinned DESC, p.created_at DESC LIMIT @limit OFFSET @offset`
@@ -212,7 +212,7 @@ router.get('/wall', (req, res) => {
 
   const ids = posts.map((p) => p.id);
   const comments = ids.length
-    ? db
+    ? await db
         .prepare(
           `SELECT * FROM comments WHERE status = 'published' AND post_id IN (${ids.join(',')}) ORDER BY created_at ASC`
         )
@@ -221,9 +221,9 @@ router.get('/wall', (req, res) => {
   const vid = req.session.vid;
   const liked = new Set(
     vid && ids.length
-      ? db
+      ? (await db
           .prepare(`SELECT post_id FROM post_likes WHERE visitor = ? AND post_id IN (${ids.join(',')})`)
-          .all(vid)
+          .all(vid))
           .map((r) => r.post_id)
       : []
   );
@@ -234,11 +234,11 @@ router.get('/wall', (req, res) => {
   res.render('public/wall', { pageTitle: 'सामुदायिक मंच', posts, cat, pg });
 });
 
-router.post('/wall/post', postLimiter, publicUpload.single('image'), (req, res) => {
+router.post('/wall/post', postLimiter, publicUpload.single('image'), async (req, res) => {
   const body = req.body ?? {};
   const memberNo = str(body.member_no, 20).toUpperCase();
   const phone = normalizePhone(body.phone);
-  const member = db
+  const member = await db
     .prepare("SELECT id, name, salutation FROM members WHERE status = 'approved' AND member_no = ? AND phone = ?")
     .get(memberNo, phone);
   if (!member) {
@@ -257,7 +257,7 @@ router.post('/wall/post', postLimiter, publicUpload.single('image'), (req, res) 
     throw err;
   }
   visitorId(req);
-  db.prepare(
+  await db.prepare(
     "INSERT INTO posts (category, title, body, image, author_name, member_id, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')"
   ).run(category, str(body.title, 120) || null, postBody, image, member.name, member.id);
   res.json({ ok: true, message: 'आपकी पोस्ट समीक्षा हेतु भेज दी गई है। स्वीकृति के बाद यह मंच पर दिखाई देगी।' });
@@ -265,19 +265,19 @@ router.post('/wall/post', postLimiter, publicUpload.single('image'), (req, res) 
 
 /* ---------- Events ---------- */
 
-router.get('/events', (req, res) => {
+router.get('/events', async (req, res) => {
   const today = todayISO();
-  const upcoming = db
+  const upcoming = await db
     .prepare('SELECT * FROM events WHERE visible = 1 AND event_date >= ? ORDER BY event_date ASC')
     .all(today);
-  const past = db
+  const past = await db
     .prepare('SELECT * FROM events WHERE visible = 1 AND (event_date < ? OR event_date IS NULL) ORDER BY event_date DESC')
     .all(today);
   res.render('public/events', { pageTitle: 'गतिविधियाँ एवं आयोजन', upcoming, past });
 });
 
-router.get('/events/:id', (req, res, next) => {
-  const event = db.prepare('SELECT * FROM events WHERE id = ? AND visible = 1').get(int(req.params.id, 0));
+router.get('/events/:id', async (req, res, next) => {
+  const event = await db.prepare('SELECT * FROM events WHERE id = ? AND visible = 1').get(int(req.params.id, 0));
   if (!event) return next();
   let gallery = [];
   try {
@@ -290,8 +290,8 @@ router.get('/events/:id', (req, res, next) => {
 
 /* ---------- Custom pages ---------- */
 
-router.get('/page/:slug', (req, res, next) => {
-  const section = db
+router.get('/page/:slug', async (req, res, next) => {
+  const section = await db
     .prepare("SELECT * FROM sections WHERE slug = ? AND has_page = 1 AND visible = 1 AND kind = 'custom'")
     .get(String(req.params.slug));
   if (!section) return next();

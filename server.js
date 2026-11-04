@@ -15,8 +15,8 @@ import publicRoutes from './src/routes/public.js';
 import apiRoutes from './src/routes/api.js';
 import adminRoutes from './src/routes/admin/index.js';
 
-seedIfEmpty();
-pauseInterruptedBroadcasts();
+await seedIfEmpty();
+await pauseInterruptedBroadcasts();
 
 const app = express();
 app.set('view engine', 'ejs');
@@ -46,7 +46,7 @@ app.use(
 app.use(
   cookieSession({
     name: 'arvs_sess',
-    keys: [getSessionSecret()],
+    keys: [await getSessionSecret()],
     maxAge: 12 * 60 * 60 * 1000,
     sameSite: 'lax',
     httpOnly: true,
@@ -66,19 +66,19 @@ app.use('/admin', adminRoutes);
 app.use('/', publicRoutes);
 
 /** Static-file errors reach the handlers below before the view locals are populated. */
-function ensureViewLocals(req, res) {
+async function ensureViewLocals(req, res) {
   if (res.locals.site) return;
-  viewHelpers(req, res, () => {});
-  loadAdmin(req, res, () => {});
+  await viewHelpers(req, res, () => {});
+  await loadAdmin(req, res, () => {});
 }
 
-app.use((req, res) => {
-  ensureViewLocals(req, res);
+app.use(async (req, res) => {
+  await ensureViewLocals(req, res);
   res.status(404).render('public/error', { pageTitle: 'पृष्ठ नहीं मिला', code: 404, message: 'आप जिस पृष्ठ को खोज रहे हैं, वह उपलब्ध नहीं है।' });
 });
 
-app.use((err, req, res, _next) => {
-  ensureViewLocals(req, res);
+app.use(async (err, req, res, _next) => {
+  await ensureViewLocals(req, res);
   const isUpload = err instanceof UploadError || err?.name === 'MulterError';
   const status = isUpload ? 400 : err.status || err.statusCode || 500;
   const message = isUpload

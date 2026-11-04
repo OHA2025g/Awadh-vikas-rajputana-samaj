@@ -135,44 +135,49 @@ function pickPhone(i) {
   return `9198${String(10000000 + i * 7919).slice(-8)}`;
 }
 
-export function seedIfEmpty() {
-  const hasAdmin = db.prepare('SELECT COUNT(*) AS n FROM admins').get().n > 0;
+export async function seedIfEmpty() {
+  const hasAdmin = (await db.prepare('SELECT COUNT(*) AS n FROM admins').get()).n > 0;
   if (!hasAdmin) {
     const username = process.env.ADMIN_USERNAME || 'admin';
     const password = process.env.ADMIN_PASSWORD || 'admin123';
-    db.prepare(
+    await db.prepare(
       "INSERT INTO admins (username, name, password_hash, role, must_change_password) VALUES (?, ?, ?, 'superadmin', ?)"
     ).run(username, 'मुख्य एडमिन', bcrypt.hashSync(password, 10), process.env.ADMIN_PASSWORD ? 0 : 1);
     console.log(`[seed] एडमिन बनाया गया: ${username} (पहले लॉगिन पर पासवर्ड बदलना आवश्यक है)`);
   }
 
-  if (getSetting('seeded')) return;
+  if (await getSetting('seeded')) return;
 
-  tx(() => {
-    const insSection = db.prepare(`INSERT OR IGNORE INTO sections
+  await tx(async () => {
+    const insSection = db.prepare(`INSERT INTO sections
       (slug, kind, nav_label, title, subtitle, body, body2, image, layout, show_on_home, has_page, show_in_nav, visible, sort_order)
-      VALUES (@slug, @kind, @nav_label, @title, @subtitle, @body, @body2, @image, @layout, 1, 0, 0, 1, @sort_order)`);
-    SECTIONS.forEach((s, i) =>
-      insSection.run({ body: null, body2: null, image: null, layout: 'image-right', ...s, sort_order: (i + 1) * 10 })
-    );
+      VALUES (@slug, @kind, @nav_label, @title, @subtitle, @body, @body2, @image, @layout, 1, 0, 0, 1, @sort_order)
+      ON CONFLICT (slug) DO NOTHING`);
+    for (const [i, s] of SECTIONS.entries()) {
+      await insSection.run({ body: null, body2: null, image: null, layout: 'image-right', ...s, sort_order: (i + 1) * 10 });
+    }
 
     const insPerson = db.prepare(
       'INSERT INTO people (grp, name, designation, place, bio, photo, sort_order) VALUES (?, ?, ?, ?, ?, NULL, ?)'
     );
-    PEOPLE.forEach(([grp, name, des, place, bio], i) => insPerson.run(grp, name, des, place, bio, i));
+    for (const [i, [grp, name, des, place, bio]] of PEOPLE.entries()) {
+      await insPerson.run(grp, name, des, place, bio, i);
+    }
 
     const insProgram = db.prepare('INSERT INTO programs (title, icon, image, summary, sort_order) VALUES (?, ?, ?, ?, ?)');
-    PROGRAMS.forEach(([t, icon, img, sum], i) => insProgram.run(t, icon, img || null, sum, i));
+    for (const [i, [t, icon, img, sum]] of PROGRAMS.entries()) await insProgram.run(t, icon, img || null, sum, i);
 
     const insEvent = db.prepare(
       'INSERT INTO events (title, event_date, event_time, location, image, summary, body) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
-    for (const [t, d, time, loc, img, sum] of EVENTS) insEvent.run(t, d, time, loc, img, sum, `<p>${sum}</p>`);
+    for (const [t, d, time, loc, img, sum] of EVENTS) await insEvent.run(t, d, time, loc, img, sum, `<p>${sum}</p>`);
 
     const insMandal = db.prepare('INSERT INTO mandals (name, name_en, description, sort_order) VALUES (?, ?, ?, ?)');
-    const mandalIds = MANDALS.map(([n, en, d], i) => insMandal.run(n, en, d, i).lastInsertRowid);
+    const mandalIds = [];
+    for (const [i, [n, en, d]] of MANDALS.entries()) mandalIds.push((await insMandal.run(n, en, d, i)).lastInsertRowid);
     const insCommittee = db.prepare('INSERT INTO committees (name, name_en, sort_order) VALUES (?, ?, ?)');
-    const committeeIds = COMMITTEES.map(([n, en], i) => insCommittee.run(n, en, i).lastInsertRowid);
+    const committeeIds = [];
+    for (const [i, [n, en]] of COMMITTEES.entries()) committeeIds.push((await insCommittee.run(n, en, i)).lastInsertRowid);
 
     const insMember = db.prepare(`INSERT INTO members
       (status, category, designation, salutation, name, father_name, gender, phone, whatsapp, city, district, state,
@@ -181,66 +186,70 @@ export function seedIfEmpty() {
        @mandal_id, @committee_id, @gotra, @native_place, @occupation, @sort_order, @member_no, @approved_at)`);
     const setAppNo = db.prepare('UPDATE members SET application_no = ? WHERE id = ?');
 
-    MEMBERS.forEach(([category, designation, sal, name, father, city, mi, ci, gotra, native, occ], i) => {
-      const id = insMember.run({
-        status: 'approved',
-        category,
-        designation: designation || null,
-        salutation: sal,
-        name,
-        father_name: father,
-        gender: ['श्रीमती', 'कु.', 'सुश्री'].includes(sal) ? 'महिला' : 'पुरुष',
-        phone: pickPhone(i + 1),
-        city,
-        mandal_id: mandalIds[mi],
-        committee_id: committeeIds[ci],
-        gotra,
-        native_place: native,
-        occupation: occ,
-        sort_order: i,
-        member_no: `ARVS-${String(i + 1).padStart(4, '0')}`,
-        approved_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
-      }).lastInsertRowid;
-      setAppNo.run(nextApplicationNo(id), id);
-    });
-    setSetting('member_counter', MEMBERS.length);
+    for (const [i, [category, designation, sal, name, father, city, mi, ci, gotra, native, occ]] of MEMBERS.entries()) {
+      const id = (
+        await insMember.run({
+          status: 'approved',
+          category,
+          designation: designation || null,
+          salutation: sal,
+          name,
+          father_name: father,
+          gender: ['श्रीमती', 'कु.', 'सुश्री'].includes(sal) ? 'महिला' : 'पुरुष',
+          phone: pickPhone(i + 1),
+          city,
+          mandal_id: mandalIds[mi],
+          committee_id: committeeIds[ci],
+          gotra,
+          native_place: native,
+          occupation: occ,
+          sort_order: i,
+          member_no: `ARVS-${String(i + 1).padStart(4, '0')}`,
+          approved_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        })
+      ).lastInsertRowid;
+      await setAppNo.run(nextApplicationNo(id), id);
+    }
+    await setSetting('member_counter', MEMBERS.length);
 
-    PENDING.forEach(([sal, name, father, city, mi, ci, gotra, native, occ], i) => {
-      const id = insMember.run({
-        status: 'pending',
-        category: 'sadasya',
-        designation: null,
-        salutation: sal,
-        name,
-        father_name: father,
-        gender: sal === 'श्रीमती' ? 'महिला' : 'पुरुष',
-        phone: pickPhone(100 + i),
-        city,
-        mandal_id: mandalIds[mi],
-        committee_id: committeeIds[ci],
-        gotra,
-        native_place: native,
-        occupation: occ,
-        sort_order: 0,
-        member_no: null,
-        approved_at: null,
-      }).lastInsertRowid;
-      setAppNo.run(nextApplicationNo(id), id);
-    });
+    for (const [i, [sal, name, father, city, mi, ci, gotra, native, occ]] of PENDING.entries()) {
+      const id = (
+        await insMember.run({
+          status: 'pending',
+          category: 'sadasya',
+          designation: null,
+          salutation: sal,
+          name,
+          father_name: father,
+          gender: sal === 'श्रीमती' ? 'महिला' : 'पुरुष',
+          phone: pickPhone(100 + i),
+          city,
+          mandal_id: mandalIds[mi],
+          committee_id: committeeIds[ci],
+          gotra,
+          native_place: native,
+          occupation: occ,
+          sort_order: 0,
+          member_no: null,
+          approved_at: null,
+        })
+      ).lastInsertRowid;
+      await setAppNo.run(nextApplicationNo(id), id);
+    }
 
     const insPost = db.prepare(
-      "INSERT INTO posts (category, title, body, image, author_name, pinned, likes, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'published', datetime('now', ?))"
+      "INSERT INTO posts (category, title, body, image, author_name, pinned, likes, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'published', NOW() + ($8::text)::interval)"
     );
     const insComment = db.prepare('INSERT INTO comments (post_id, name, body) VALUES (?, ?, ?)');
-    POSTS.forEach(([cat, title, body, img, author, pinned], i) => {
-      const postId = insPost.run(cat, title, body, img || null, author, pinned, 12 - i * 3, `-${i * 2 + 1} days`).lastInsertRowid;
+    for (const [i, [cat, title, body, img, author, pinned]] of POSTS.entries()) {
+      const postId = (await insPost.run(cat, title, body, img || null, author, pinned, 12 - i * 3, `${-(i * 2 + 1)} days`)).lastInsertRowid;
       if (i === 1) {
-        insComment.run(postId, 'राजेश सिंह', 'बहुत-बहुत बधाई बिटिया को! समाज का नाम रोशन किया।');
-        insComment.run(postId, 'सुनीता सिंह', 'हार्दिक शुभकामनाएँ 🌸');
+        await insComment.run(postId, 'राजेश सिंह', 'बहुत-बहुत बधाई बिटिया को! समाज का नाम रोशन किया।');
+        await insComment.run(postId, 'सुनीता सिंह', 'हार्दिक शुभकामनाएँ 🌸');
       }
-    });
+    }
 
-    setSetting('seeded', true);
+    await setSetting('seeded', true);
   });
   console.log('[seed] नमूना सामग्री जोड़ी गई।');
 }

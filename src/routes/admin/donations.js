@@ -16,11 +16,11 @@ const queryString = (filters) =>
 const memberStmt = db.prepare('SELECT id, salutation, name, member_no, city, status FROM members WHERE id = ?');
 const memberLabel = (m) => [m.salutation, m.name].filter(Boolean).join(' ');
 
-router.get('/donations', (req, res) => {
+router.get('/donations', async (req, res) => {
   const filters = donationFilters(req.query);
-  const totals = donationTotals(filters);
+  const totals = await donationTotals(filters);
   const pg = paginate(totals[filters.category || 'all'].n, int(req.query.page), PER_PAGE);
-  const { rows } = listDonations(filters, { limit: PER_PAGE, offset: pg.offset });
+  const { rows } = await listDonations(filters, { limit: PER_PAGE, offset: pg.offset });
   res.render('admin/donations', {
     pageTitle: 'दान एवं भुगतान',
     filters,
@@ -32,12 +32,12 @@ router.get('/donations', (req, res) => {
 });
 
 /** Approved members for the entry form's search box. Phone numbers are deliberately not returned. */
-router.get('/donations/members', (req, res) => {
+router.get('/donations/members', async (req, res) => {
   const q = str(req.query.q, 60);
   const where = q
     ? `AND (m.name LIKE @q ESCAPE '\\' OR m.name_en LIKE @q ESCAPE '\\' OR m.member_no LIKE @q ESCAPE '\\' OR m.city LIKE @q ESCAPE '\\')`
     : '';
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT m.id, m.salutation, m.name, m.member_no, m.city, md.name AS mandal_name,
               (SELECT COUNT(*) FROM donations d WHERE d.member_id = m.id AND d.category = 'lifetime') AS lifetime_count
@@ -57,8 +57,8 @@ router.get('/donations/members', (req, res) => {
   });
 });
 
-function blankDonation(query) {
-  const member = int(query.member) ? memberStmt.get(int(query.member)) : null;
+async function blankDonation(query) {
+  const member = int(query.member) ? await memberStmt.get(int(query.member)) : null;
   return {
     category: DONATION_CATEGORY_KEYS.includes(query.category) ? query.category : 'lifetime',
     payment_mode: 'cash',
@@ -87,10 +87,10 @@ function renderForm(res, d, errors = []) {
  * Validate the entry form. A donation whose member was later deleted keeps its saved
  * donor name; any newly chosen member must be approved.
  */
-function parseDonation(body, existing = null) {
+async function parseDonation(body, existing = null) {
   const errors = [];
   const memberId = int(body.member_id);
-  const member = memberId ? memberStmt.get(memberId) : null;
+  const member = memberId ? await memberStmt.get(memberId) : null;
   const keepsOldMember = existing && memberId === existing.member_id;
   let donorName = existing?.donor_name || '';
   if (member && (member.status === 'approved' || keepsOldMember)) donorName = memberLabel(member);
@@ -127,12 +127,12 @@ function parseDonation(body, existing = null) {
   return { v, errors, formValues };
 }
 
-router.get('/donations/new', (req, res) => renderForm(res, blankDonation(req.query)));
+router.get('/donations/new', async (req, res) => renderForm(res, await blankDonation(req.query)));
 
-router.post('/donations', (req, res) => {
-  const { v, errors, formValues } = parseDonation(req.body ?? {});
+router.post('/donations', async (req, res) => {
+  const { v, errors, formValues } = await parseDonation(req.body ?? {});
   if (errors.length) return renderForm(res, formValues, errors);
-  db.prepare(
+  await db.prepare(
     `INSERT INTO donations (member_id, donor_name, category, amount_paise, payment_mode, reference, details, paid_on, anonymous, admin_id)
      VALUES (@member_id, @donor_name, @category, @amount_paise, @payment_mode, @reference, @details, @paid_on, @anonymous, @admin_id)`
   ).run({ ...v, admin_id: req.admin.id });
@@ -140,18 +140,18 @@ router.post('/donations', (req, res) => {
   res.redirect(req.body?.again ? `/admin/donations/new?category=${v.category}` : `/admin/donations?category=${v.category}`);
 });
 
-router.get('/donations/:id/edit', (req, res, next) => {
-  const d = getDonation(req.params.id);
+router.get('/donations/:id/edit', async (req, res, next) => {
+  const d = await getDonation(req.params.id);
   if (!d) return next();
   renderForm(res, { ...d, amount: amountInput(d.amount_paise) });
 });
 
-router.post('/donations/:id', (req, res, next) => {
-  const existing = getDonation(req.params.id);
+router.post('/donations/:id', async (req, res, next) => {
+  const existing = await getDonation(req.params.id);
   if (!existing) return next();
-  const { v, errors, formValues } = parseDonation(req.body ?? {}, existing);
+  const { v, errors, formValues } = await parseDonation(req.body ?? {}, existing);
   if (errors.length) return renderForm(res, formValues, errors);
-  db.prepare(
+  await db.prepare(
     `UPDATE donations SET member_id = @member_id, donor_name = @donor_name, category = @category, amount_paise = @amount_paise,
        payment_mode = @payment_mode, reference = @reference, details = @details, paid_on = @paid_on, anonymous = @anonymous,
        updated_by = @updated_by, updated_at = CURRENT_TIMESTAMP
@@ -161,10 +161,10 @@ router.post('/donations/:id', (req, res, next) => {
   res.redirect(`/admin/donations?category=${v.category}`);
 });
 
-router.post('/donations/:id/delete', requireSuper, (req, res) => {
-  const d = getDonation(req.params.id);
+router.post('/donations/:id/delete', requireSuper, async (req, res) => {
+  const d = await getDonation(req.params.id);
   if (d) {
-    db.prepare('DELETE FROM donations WHERE id = ?').run(d.id);
+    await db.prepare('DELETE FROM donations WHERE id = ?').run(d.id);
     flash(req, 'success', `${d.name} की ${formatINR(d.amount_paise)} की प्रविष्टि हटाई गई।`);
   }
   res.redirect(`/admin/donations${d ? `?category=${d.category}` : ''}`);
@@ -186,8 +186,8 @@ const EXPORT_COLUMNS = [
   ['entered_by', 'प्रविष्टि कर्ता', 18],
 ];
 
-function exportRows(req) {
-  return allDonations(donationFilters(req.query)).map((d, i) => ({
+async function exportRows(req) {
+  return (await allDonations(donationFilters(req.query))).map((d, i) => ({
     ...d,
     sr: i + 1,
     paid_on_out: formatDate(d.paid_on, 'numeric'),
@@ -204,8 +204,8 @@ const exportName = (req, ext) => {
   return `donations${cat}-${todayISO()}.${ext}`;
 };
 
-router.get('/donations/export.csv', (req, res) => {
-  const rows = exportRows(req);
+router.get('/donations/export.csv', async (req, res) => {
+  const rows = await exportRows(req);
   const lines = [EXPORT_COLUMNS.map(([, label]) => csvCell(label)).join(',')];
   for (const r of rows) lines.push(EXPORT_COLUMNS.map(([key]) => csvCell(key === 'amount' ? r.amount.toFixed(2) : r[key])).join(','));
   const total = rows.reduce((s, r) => s + r.amount_paise, 0);
@@ -216,7 +216,7 @@ router.get('/donations/export.csv', (req, res) => {
 });
 
 router.get('/donations/export.xlsx', async (req, res) => {
-  const rows = exportRows(req);
+  const rows = await exportRows(req);
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Awadh Rajput Vikas Sangh';
   const ws = wb.addWorksheet('दान खाता');

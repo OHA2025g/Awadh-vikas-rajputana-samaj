@@ -12,7 +12,7 @@ const router = express.Router();
 const idList = (v) => [].concat(v || []).map(Number).filter(Number.isInteger);
 
 /** Resolve a broadcast target into approved members with a usable WhatsApp number. */
-function resolveTarget(body) {
+async function resolveTarget(body) {
   const type = ['all', 'mandal', 'committee', 'category'].includes(body?.type) ? body.type : 'all';
   const where = ["m.status = 'approved'"];
   let label = 'सभी स्वीकृत सदस्य';
@@ -21,14 +21,14 @@ function resolveTarget(body) {
     case 'mandal': {
       ids = idList(body.mandals);
       where.push(ids.length ? `m.mandal_id IN (${ids.join(',')})` : '0');
-      const names = ids.length ? db.prepare(`SELECT name FROM mandals WHERE id IN (${ids.join(',')})`).all().map((r) => r.name) : [];
+      const names = ids.length ? (await db.prepare(`SELECT name FROM mandals WHERE id IN (${ids.join(',')})`).all()).map((r) => r.name) : [];
       label = `मंडल: ${names.join(', ') || '—'}`;
       break;
     }
     case 'committee': {
       ids = idList(body.committees);
       where.push(ids.length ? `m.committee_id IN (${ids.join(',')})` : '0');
-      const names = ids.length ? db.prepare(`SELECT name FROM committees WHERE id IN (${ids.join(',')})`).all().map((r) => r.name) : [];
+      const names = ids.length ? (await db.prepare(`SELECT name FROM committees WHERE id IN (${ids.join(',')})`).all()).map((r) => r.name) : [];
       label = `समिति: ${names.join(', ') || '—'}`;
       break;
     }
@@ -43,7 +43,7 @@ function resolveTarget(body) {
     default:
       throw new Error(`Unhandled target type: ${type}`);
   }
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT m.id, m.name, m.salutation, m.member_no, m.city, m.designation, m.phone, m.whatsapp,
               md.name AS mandal_name, c.name AS committee_name
@@ -75,26 +75,26 @@ function broadcastJson(b) {
   };
 }
 
-router.get('/whatsapp', (req, res) => {
-  const cfg = getWhatsAppConfig();
+router.get('/whatsapp', async (req, res) => {
+  const cfg = await getWhatsAppConfig();
   res.render('admin/whatsapp', {
     pageTitle: 'व्हाट्सऐप प्रसारण',
     cfg: { ...cfg, cloud_token: cfg.cloud_token ? '••••••••' : '' },
     hasToken: Boolean(cfg.cloud_token),
     gateway: gatewayStatus(),
     variables: VARIABLES,
-    mandals: db.prepare('SELECT id, name FROM mandals ORDER BY sort_order, id').all(),
-    committees: db.prepare('SELECT id, name FROM committees ORDER BY sort_order, id').all(),
-    broadcasts: db.prepare('SELECT * FROM broadcasts ORDER BY id DESC LIMIT 20').all().map(broadcastJson),
+    mandals: await db.prepare('SELECT id, name FROM mandals ORDER BY sort_order, id').all(),
+    committees: await db.prepare('SELECT id, name FROM committees ORDER BY sort_order, id').all(),
+    broadcasts: (await db.prepare('SELECT * FROM broadcasts ORDER BY id DESC LIMIT 20').all()).map(broadcastJson),
   });
 });
 
-router.get('/whatsapp/status', (req, res) => {
+router.get('/whatsapp/status', async (req, res) => {
   res.json({ ok: true, gateway: gatewayStatus() });
 });
 
 router.post('/whatsapp/connect', async (req, res) => {
-  if (getWhatsAppConfig().provider !== 'baileys') {
+  if ((await getWhatsAppConfig()).provider !== 'baileys') {
     return res.status(422).json({ ok: false, error: 'QR गेटवे चुना हुआ नहीं है।' });
   }
   connectBaileys().catch((err) => console.error('[whatsapp]', err.message));
@@ -113,7 +113,7 @@ router.post('/whatsapp/logout', requireSuper, async (req, res) => {
 
 router.post('/whatsapp/config', requireSuper, async (req, res) => {
   const b = req.body ?? {};
-  const current = getWhatsAppConfig();
+  const current = await getWhatsAppConfig();
   const provider = ['baileys', 'cloud', 'none'].includes(b.provider) ? b.provider : current.provider;
   const next = {
     provider,
@@ -127,42 +127,42 @@ router.post('/whatsapp/config', requireSuper, async (req, res) => {
   };
   if (next.delay_max < next.delay_min) next.delay_max = next.delay_min;
   if (b.clear_token) next.cloud_token = '';
-  setSetting('whatsapp', next);
+  await setSetting('whatsapp', next);
   if (current.provider === 'baileys' && provider !== 'baileys') await disconnectBaileys({ logout: false });
   flash(req, 'success', 'व्हाट्सऐप सेटिंग सहेजी गई।');
   res.redirect('/admin/whatsapp');
 });
 
-router.post('/whatsapp/preview', (req, res) => {
-  const { label, recipients } = resolveTarget(req.body?.target);
+router.post('/whatsapp/preview', async (req, res) => {
+  const { label, recipients } = await resolveTarget(req.body?.target);
   const sample = recipients[0];
   res.json({
     ok: true,
     label,
     count: recipients.length,
     recipients: recipients.slice(0, 50).map((m) => ({ name: m.name, mandal: m.mandal_name || '', phone: maskPhone(m.target_phone) })),
-    preview: personalize(text(req.body?.message, 4000), sample || { name: 'राजेश सिंह' }, getSite()),
+    preview: personalize(text(req.body?.message, 4000), sample || { name: 'राजेश सिंह' }, await getSite()),
   });
 });
 
-router.post('/whatsapp/send', (req, res) => {
+router.post('/whatsapp/send', async (req, res) => {
   const message = text(req.body?.message, 4000);
   if (message.length < 2) return res.status(422).json({ ok: false, error: 'कृपया संदेश लिखें।' });
-  const { label, recipients } = resolveTarget(req.body?.target);
+  const { label, recipients } = await resolveTarget(req.body?.target);
   if (!recipients.length) return res.status(422).json({ ok: false, error: 'चुने गए समूह में कोई सदस्य नहीं है।' });
 
-  const id = tx(() => {
-    const info = db
+  const id = await tx(async () => {
+    const info = await db
       .prepare("INSERT INTO broadcasts (message, target_label, provider, total, status, admin_id) VALUES (?, ?, ?, ?, 'queued', ?)")
-      .run(message, label, getWhatsAppConfig().provider, recipients.length, req.admin.id);
+      .run(message, label, (await getWhatsAppConfig()).provider, recipients.length, req.admin.id);
     const ins = db.prepare('INSERT INTO broadcast_recipients (broadcast_id, member_id, phone) VALUES (?, ?, ?)');
-    for (const r of recipients) ins.run(info.lastInsertRowid, r.id, r.target_phone);
+    for (const r of recipients) await ins.run(info.lastInsertRowid, r.id, r.target_phone);
     return Number(info.lastInsertRowid);
   });
   enqueueBroadcast(id);
   res.json({
     ok: true,
-    broadcast: broadcastJson(db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(id)),
+    broadcast: broadcastJson(await db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(id)),
     warning: isGatewayReady() ? null : 'गेटवे अभी जुड़ा नहीं है — प्रसारण रुका रहेगा। कनेक्ट करने के बाद "पुनः आरंभ" दबाएँ।',
   });
 });
@@ -171,33 +171,33 @@ router.post('/whatsapp/test', requireSuper, async (req, res) => {
   const phone = normalizePhone(req.body?.phone);
   if (!phone) return res.status(422).json({ ok: false, error: 'मान्य मोबाइल नंबर लिखें।' });
   try {
-    await sendWhatsApp(phone, text(req.body?.message, 1000) || `${getSite().org_name} — परीक्षण संदेश ✅`);
+    await sendWhatsApp(phone, text(req.body?.message, 1000) || `${(await getSite()).org_name} — परीक्षण संदेश ✅`);
     res.json({ ok: true });
   } catch (err) {
     res.status(422).json({ ok: false, error: err.message });
   }
 });
 
-router.get('/whatsapp/broadcasts/:id', (req, res, next) => {
-  const b = db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(int(req.params.id, 0));
+router.get('/whatsapp/broadcasts/:id', async (req, res, next) => {
+  const b = await db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(int(req.params.id, 0));
   if (!b) return next();
-  const recipients = db
+  const recipients = (await db
     .prepare(
       `SELECT r.status, r.error, r.phone, m.name FROM broadcast_recipients r LEFT JOIN members m ON m.id = r.member_id
        WHERE r.broadcast_id = ? ORDER BY CASE r.status WHEN 'failed' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END, r.id LIMIT 500`
     )
-    .all(b.id)
+    .all(b.id))
     .map((r) => ({ name: r.name || '—', phone: maskPhone(r.phone), status: r.status, error: r.error }));
   res.json({ ok: true, broadcast: broadcastJson(b), recipients });
 });
 
-router.post('/whatsapp/broadcasts/:id/:action', (req, res) => {
+router.post('/whatsapp/broadcasts/:id/:action', async (req, res) => {
   const id = int(req.params.id, 0);
-  const b = db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(id);
+  const b = await db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(id);
   if (!b) return res.status(404).json({ ok: false, error: 'प्रसारण नहीं मिला।' });
   switch (req.params.action) {
     case 'pause':
-      db.prepare("UPDATE broadcasts SET status = 'paused' WHERE id = ? AND status IN ('running', 'queued')").run(id);
+      await db.prepare("UPDATE broadcasts SET status = 'paused' WHERE id = ? AND status IN ('running', 'queued')").run(id);
       break;
     case 'resume':
       if (b.status === 'paused') {
@@ -206,18 +206,18 @@ router.post('/whatsapp/broadcasts/:id/:action', (req, res) => {
       }
       break;
     case 'retry':
-      db.prepare("UPDATE broadcast_recipients SET status = 'pending', error = NULL WHERE broadcast_id = ? AND status = 'failed'").run(id);
-      db.prepare("UPDATE broadcasts SET failed = 0, status = 'paused' WHERE id = ?").run(id);
+      await db.prepare("UPDATE broadcast_recipients SET status = 'pending', error = NULL WHERE broadcast_id = ? AND status = 'failed'").run(id);
+      await db.prepare("UPDATE broadcasts SET failed = 0, status = 'paused' WHERE id = ?").run(id);
       if (isGatewayReady()) enqueueBroadcast(id);
       break;
     case 'cancel':
-      db.prepare("UPDATE broadcast_recipients SET status = 'skipped' WHERE broadcast_id = ? AND status = 'pending'").run(id);
-      db.prepare("UPDATE broadcasts SET status = 'cancelled', finished_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+      await db.prepare("UPDATE broadcast_recipients SET status = 'skipped' WHERE broadcast_id = ? AND status = 'pending'").run(id);
+      await db.prepare("UPDATE broadcasts SET status = 'cancelled', finished_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
       break;
     default:
       return res.status(400).json({ ok: false, error: 'अमान्य कार्य।' });
   }
-  res.json({ ok: true, broadcast: broadcastJson(db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(id)) });
+  res.json({ ok: true, broadcast: broadcastJson(await db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(id)) });
 });
 
 export default router;

@@ -3,9 +3,9 @@ import { db } from '../db.js';
 
 const findAdmin = db.prepare('SELECT id, username, name, role, must_change_password FROM admins WHERE id = ?');
 
-export function loadAdmin(req, res, next) {
+export async function loadAdmin(req, res, next) {
   const id = req.session?.adminId;
-  const admin = id ? findAdmin.get(id) : null;
+  const admin = id ? await findAdmin.get(id) : null;
   if (id && !admin) req.session.adminId = null;
   req.admin = admin || null;
   res.locals.admin = req.admin;

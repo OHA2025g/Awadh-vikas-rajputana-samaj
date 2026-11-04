@@ -102,8 +102,8 @@ const setStmt = db.prepare(
   'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
 );
 
-export function getSetting(key, fallback = null) {
-  const row = getStmt.get(key);
+export async function getSetting(key, fallback = null) {
+  const row = await getStmt.get(key);
   if (!row) return fallback;
   try {
     return JSON.parse(row.value);
@@ -112,16 +112,16 @@ export function getSetting(key, fallback = null) {
   }
 }
 
-export function setSetting(key, value) {
-  setStmt.run(key, JSON.stringify(value));
+export async function setSetting(key, value) {
+  await setStmt.run(key, JSON.stringify(value));
 }
 
-export function getSite() {
-  return { ...DEFAULT_SITE, ...getSetting('site', {}) };
+export async function getSite() {
+  return { ...DEFAULT_SITE, ...(await getSetting('site', {})) };
 }
 
-export function getWhatsAppConfig() {
-  return { ...DEFAULT_WHATSAPP, ...getSetting('whatsapp', {}) };
+export async function getWhatsAppConfig() {
+  return { ...DEFAULT_WHATSAPP, ...(await getSetting('whatsapp', {})) };
 }
 
 function isPlainObject(v) {
@@ -143,16 +143,16 @@ function mergeDefaults(defaults, saved) {
  * Calibrations saved before field Y became the text baseline would print in the
  * wrong place, so only their printer offsets are carried over.
  */
-export function getCalibration() {
-  const saved = getSetting('print_calibration', {});
+export async function getCalibration() {
+  const saved = await getSetting('print_calibration', {});
   if (saved?.version === CALIBRATION_VERSION) return mergeDefaults(DEFAULT_CALIBRATION, saved);
   const legacy = {};
   for (const k of ['offsetX', 'offsetY']) if (Number.isFinite(saved?.[k])) legacy[k] = saved[k];
   return mergeDefaults(DEFAULT_CALIBRATION, legacy);
 }
 
-export function saveCalibration(input) {
-  setSetting('print_calibration', { ...sanitizeCalibration(input), version: CALIBRATION_VERSION });
+export async function saveCalibration(input) {
+  await setSetting('print_calibration', { ...sanitizeCalibration(input), version: CALIBRATION_VERSION });
 }
 
 /** Keep only known keys with values of the same type as the defaults. */
@@ -174,20 +174,20 @@ export function sanitizeCalibration(input, defaults = DEFAULT_CALIBRATION) {
   return out;
 }
 
-export function getSessionSecret() {
+export async function getSessionSecret() {
   if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
-  let secret = getSetting('session_secret');
+  let secret = await getSetting('session_secret');
   if (!secret) {
     secret = crypto.randomBytes(32).toString('hex');
-    setSetting('session_secret', secret);
+    await setSetting('session_secret', secret);
   }
   return secret;
 }
 
 /** Atomically take the next value of a named counter. */
-export function nextCounter(key) {
-  const current = Number(getSetting(key, 0)) || 0;
+export async function nextCounter(key) {
+  const current = Number(await getSetting(key, 0)) || 0;
   const next = current + 1;
-  setSetting(key, next);
+  await setSetting(key, next);
   return next;
 }

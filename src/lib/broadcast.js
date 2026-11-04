@@ -39,7 +39,9 @@ const queue = [];
 let running = null;
 
 export function enqueueBroadcast(id) {
-  db.prepare("UPDATE broadcasts SET status = 'queued' WHERE id = ? AND status = 'paused'").run(id);
+  db.prepare("UPDATE broadcasts SET status = 'queued' WHERE id = ? AND status = 'paused'")
+    .run(id)
+    .catch((err) => console.error('[broadcast]', err));
   if (!queue.includes(id) && running !== id) queue.push(id);
   pump();
 }
@@ -50,7 +52,7 @@ function pump() {
   runBroadcast(running)
     .catch((err) => {
       console.error('[broadcast]', err);
-      db.prepare("UPDATE broadcasts SET status = 'paused' WHERE id = ? AND status = 'running'").run(running);
+      return db.prepare("UPDATE broadcasts SET status = 'paused' WHERE id = ? AND status = 'running'").run(running);
     })
     .finally(() => {
       running = null;
@@ -69,42 +71,42 @@ const bumpSent = db.prepare('UPDATE broadcasts SET sent = sent + 1 WHERE id = ?'
 const bumpFailed = db.prepare('UPDATE broadcasts SET failed = failed + 1 WHERE id = ?');
 
 async function runBroadcast(id) {
-  const started = db
+  const started = await db
     .prepare("UPDATE broadcasts SET status = 'running' WHERE id = ? AND status = 'queued'")
     .run(id);
   if (started.changes === 0) return;
-  const site = getSite();
+  const site = await getSite();
 
   for (;;) {
-    const b = db.prepare('SELECT status, message FROM broadcasts WHERE id = ?').get(id);
+    const b = await db.prepare('SELECT status, message FROM broadcasts WHERE id = ?').get(id);
     if (!b || b.status !== 'running') return;
-    const r = nextRecipient.get(id);
+    const r = await nextRecipient.get(id);
     if (!r) break;
 
-    const member = (r.member_id && memberStmt.get(r.member_id)) || {};
+    const member = (r.member_id && (await memberStmt.get(r.member_id))) || {};
     try {
       await sendWhatsApp(r.phone, personalize(b.message, member, site));
-      markSent.run(r.id);
-      bumpSent.run(id);
+      await markSent.run(r.id);
+      await bumpSent.run(id);
     } catch (err) {
       if (err instanceof GatewayNotReadyError) {
-        db.prepare("UPDATE broadcasts SET status = 'paused' WHERE id = ?").run(id);
+        await db.prepare("UPDATE broadcasts SET status = 'paused' WHERE id = ?").run(id);
         return;
       }
-      markFailed.run(String(err.message || err).slice(0, 300), r.id);
-      bumpFailed.run(id);
+      await markFailed.run(String(err.message || err).slice(0, 300), r.id);
+      await bumpFailed.run(id);
     }
 
-    const cfg = getWhatsAppConfig();
+    const cfg = await getWhatsAppConfig();
     const min = Math.max(0, Number(cfg.delay_min) || 0);
     const max = Math.max(min, Number(cfg.delay_max) || min);
     const delayMs = cfg.provider === 'cloud' ? 250 : (min + Math.random() * (max - min)) * 1000;
     await sleep(delayMs);
   }
 
-  db.prepare("UPDATE broadcasts SET status = 'done', finished_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+  await db.prepare("UPDATE broadcasts SET status = 'done', finished_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
 }
 
-export function pauseInterruptedBroadcasts() {
-  db.prepare("UPDATE broadcasts SET status = 'paused' WHERE status IN ('running', 'queued')").run();
+export async function pauseInterruptedBroadcasts() {
+  await db.prepare("UPDATE broadcasts SET status = 'paused' WHERE status IN ('running', 'queued')").run();
 }

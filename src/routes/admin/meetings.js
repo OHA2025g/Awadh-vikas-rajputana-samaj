@@ -10,7 +10,7 @@ const router = express.Router();
 const PER_PAGE = 24;
 const MAX_ATTENDEES = 300;
 
-const committees = () => db.prepare('SELECT id, name FROM committees ORDER BY sort_order, id').all();
+const committees = async () => await db.prepare('SELECT id, name FROM committees ORDER BY sort_order, id').all();
 const memberLabel = (m) => [m.salutation, m.name].filter(Boolean).join(' ');
 
 function parseAttendees(raw) {
@@ -61,35 +61,35 @@ const BASE_SELECT = `
 
 const filesStmt = db.prepare('SELECT * FROM meeting_files WHERE meeting_id = ? ORDER BY id');
 
-function getMeeting(id) {
-  const m = db.prepare(`${BASE_SELECT} WHERE mt.id = ?`).get(Number(id));
+async function getMeeting(id) {
+  const m = await db.prepare(`${BASE_SELECT} WHERE mt.id = ?`).get(Number(id));
   if (!m) return null;
-  return { ...m, attendeeList: parseAttendees(m.attendees), files: filesStmt.all(m.id) };
+  return { ...m, attendeeList: parseAttendees(m.attendees), files: await filesStmt.all(m.id) };
 }
 
-router.get('/meetings', (req, res) => {
+router.get('/meetings', async (req, res) => {
   const filters = meetingFilters(req.query);
   const { sql, params } = buildWhere(filters);
-  const total = db
+  const total = (await db
     .prepare(`SELECT COUNT(*) AS n FROM meetings mt LEFT JOIN committees c ON c.id = mt.committee_id ${sql}`)
-    .get(params).n;
+    .get(params)).n;
   const pg = paginate(total, int(req.query.page), PER_PAGE);
-  const rows = db
+  const rows = await db
     .prepare(`${BASE_SELECT} ${sql} ORDER BY mt.meeting_date DESC, mt.meeting_time DESC, mt.id DESC LIMIT @limit OFFSET @offset`)
     .all({ ...params, limit: PER_PAGE, offset: pg.offset });
   const filesByMeeting = new Map(rows.map((m) => [m.id, []]));
   if (rows.length) {
-    db.prepare(
+    (await db.prepare(
       `SELECT id, meeting_id, kind, original_name FROM meeting_files WHERE meeting_id IN (${rows.map(() => '?').join(',')}) ORDER BY id`
     )
-      .all(...rows.map((m) => m.id))
+      .all(...rows.map((m) => m.id)))
       .forEach((f) => filesByMeeting.get(f.meeting_id).push(f));
   }
   for (const m of rows) {
     m.attendeeCount = parseAttendees(m.attendees).length;
     m.files = filesByMeeting.get(m.id);
   }
-  const years = db.prepare('SELECT DISTINCT substr(meeting_date, 1, 4) AS y FROM meetings ORDER BY y DESC').all().map((r) => r.y);
+  const years = (await db.prepare('SELECT DISTINCT substr(meeting_date, 1, 4) AS y FROM meetings ORDER BY y DESC').all()).map((r) => r.y);
   const { view, ...rest } = filters;
   res.render('admin/meetings', {
     pageTitle: 'बैठक विवरण (मिनट्स)',
@@ -97,13 +97,13 @@ router.get('/meetings', (req, res) => {
     rows,
     pg,
     years,
-    committees: committees(),
+    committees: await committees(),
     qs: new URLSearchParams(Object.entries({ ...rest, view: view === 'list' ? 'list' : '' }).filter(([, v]) => v !== '' && v != null)).toString(),
   });
 });
 
 /** Approved members for the attendee picker; `committee` without `q` returns that whole committee. */
-router.get('/meetings/members', (req, res) => {
+router.get('/meetings/members', async (req, res) => {
   const q = str(req.query.q, 60);
   const committee = int(req.query.committee);
   const where = ["m.status = 'approved'"];
@@ -116,7 +116,7 @@ router.get('/meetings/members', (req, res) => {
     where.push('m.committee_id = @committee');
     params.committee = committee;
   }
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT m.id, m.salutation, m.name, m.member_no, m.designation, c.name AS committee_name
        FROM members m LEFT JOIN committees c ON c.id = m.committee_id
@@ -137,14 +137,14 @@ router.get('/meetings/members', (req, res) => {
 });
 
 /** Linked members are re-labelled from the database; anyone else is kept as a typed name. */
-function cleanAttendees(raw) {
+async function cleanAttendees(raw) {
   const list = parseAttendees(raw).slice(0, MAX_ATTENDEES);
   const ids = [...new Set(list.map((a) => int(a?.id)).filter(Boolean))];
   const known = new Map(
     ids.length
-      ? db
+      ? (await db
           .prepare(`SELECT id, salutation, name, designation FROM members WHERE id IN (${ids.map(() => '?').join(',')})`)
-          .all(...ids)
+          .all(...ids))
           .map((m) => [m.id, m])
       : []
   );
@@ -163,7 +163,7 @@ function cleanAttendees(raw) {
   return out;
 }
 
-function parseMeeting(body, req) {
+async function parseMeeting(body, req) {
   const errors = [];
   const title = str(body.title, 200);
   if (!title) errors.push('बैठक का शीर्षक / विषय लिखें।');
@@ -171,14 +171,14 @@ function parseMeeting(body, req) {
   if (!date) errors.push('बैठक की तिथि दर्ज करें।');
   const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(body.meeting_time) ? body.meeting_time : null;
   const committeeId = int(body.committee_id);
-  const committee = committeeId ? db.prepare('SELECT id FROM committees WHERE id = ?').get(committeeId) : null;
+  const committee = committeeId ? await db.prepare('SELECT id FROM committees WHERE id = ?').get(committeeId) : null;
   const v = {
     title,
     meeting_date: date,
     meeting_time: time,
     venue: str(body.venue, 200),
     committee_id: committee ? committee.id : null,
-    attendees: JSON.stringify(cleanAttendees(body.attendees)),
+    attendees: JSON.stringify(await cleanAttendees(body.attendees)),
     minutes: cleanHtml(body.minutes),
   };
   if (errors.length && filesFor(req, 'files').length) errors.push('संलग्न फ़ाइलें कृपया दोबारा चुनें।');
@@ -189,12 +189,12 @@ function blankMeeting() {
   return { title: '', meeting_date: '', meeting_time: '', venue: '', committee_id: null, attendeeList: [], minutes: '', files: [] };
 }
 
-function renderForm(res, m, errors = []) {
+async function renderForm(res, m, errors = []) {
   res.status(errors.length ? 422 : 200).render('admin/meeting-form', {
     pageTitle: m.id ? 'बैठक विवरण संपादित करें' : 'नई बैठक दर्ज करें',
     m,
     errors,
-    committees: committees(),
+    committees: await committees(),
   });
 }
 
@@ -217,29 +217,29 @@ const insertFile = db.prepare(
   'INSERT INTO meeting_files (meeting_id, file, kind, original_name, size) VALUES (@meeting_id, @file, @kind, @original_name, @size)'
 );
 
-router.get('/meetings/new', (req, res) => renderForm(res, blankMeeting()));
+router.get('/meetings/new', async (req, res) => await renderForm(res, blankMeeting()));
 
-router.post('/meetings', (req, res) => {
+router.post('/meetings', async (req, res) => {
   const body = req.body ?? {};
-  const { v, errors } = parseMeeting(body, req);
-  if (errors.length) return renderForm(res, { ...v, attendeeList: JSON.parse(v.attendees), files: [] }, errors);
+  const { v, errors } = await parseMeeting(body, req);
+  if (errors.length) return await renderForm(res, { ...v, attendeeList: JSON.parse(v.attendees), files: [] }, errors);
   const uploads = saveUploads(req);
-  const id = tx(() => {
-    const { lastInsertRowid } = db
+  const id = await tx(async () => {
+    const { lastInsertRowid } = await db
       .prepare(
         `INSERT INTO meetings (title, meeting_date, meeting_time, venue, committee_id, attendees, minutes, admin_id)
          VALUES (@title, @meeting_date, @meeting_time, @venue, @committee_id, @attendees, @minutes, @admin_id)`
       )
       .run({ ...v, admin_id: req.admin.id });
-    for (const u of uploads) insertFile.run({ ...u, meeting_id: lastInsertRowid });
+    for (const u of uploads) await insertFile.run({ ...u, meeting_id: lastInsertRowid });
     return lastInsertRowid;
   });
   flash(req, 'success', `बैठक "${v.title}" दर्ज की गई${uploads.length ? ` (${uploads.length} संलग्न फ़ाइलें)` : ''}।`);
   res.redirect(`/admin/meetings/${id}`);
 });
 
-router.get('/meetings/files/:fid', (req, res, next) => {
-  const f = db.prepare('SELECT * FROM meeting_files WHERE id = ?').get(int(req.params.fid));
+router.get('/meetings/files/:fid', async (req, res, next) => {
+  const f = await db.prepare('SELECT * FROM meeting_files WHERE id = ?').get(int(req.params.fid));
   const file = f && privatePath(f.file);
   if (!file) return next();
   const name = f.original_name || `meeting-${f.meeting_id}-${f.id}.${f.file.split('.').pop()}`;
@@ -250,45 +250,45 @@ router.get('/meetings/files/:fid', (req, res, next) => {
   res.sendFile(file, (err) => err && next());
 });
 
-router.get('/meetings/:id', (req, res, next) => {
-  const m = getMeeting(req.params.id);
+router.get('/meetings/:id', async (req, res, next) => {
+  const m = await getMeeting(req.params.id);
   if (!m) return next();
   res.render('admin/meeting', { pageTitle: m.title, m });
 });
 
-router.get('/meetings/:id/edit', (req, res, next) => {
-  const m = getMeeting(req.params.id);
+router.get('/meetings/:id/edit', async (req, res, next) => {
+  const m = await getMeeting(req.params.id);
   if (!m) return next();
-  renderForm(res, m);
+  await renderForm(res, m);
 });
 
-router.post('/meetings/:id', (req, res, next) => {
-  const existing = getMeeting(req.params.id);
+router.post('/meetings/:id', async (req, res, next) => {
+  const existing = await getMeeting(req.params.id);
   if (!existing) return next();
   const body = req.body ?? {};
-  const { v, errors } = parseMeeting(body, req);
-  if (errors.length) return renderForm(res, { ...existing, ...v, attendeeList: JSON.parse(v.attendees) }, errors);
+  const { v, errors } = await parseMeeting(body, req);
+  if (errors.length) return await renderForm(res, { ...existing, ...v, attendeeList: JSON.parse(v.attendees) }, errors);
   const removeIds = new Set([].concat(body.remove_files ?? []).map((x) => int(x)));
   const removed = existing.files.filter((f) => removeIds.has(f.id));
   const uploads = saveUploads(req);
-  tx(() => {
-    db.prepare(
+  await tx(async () => {
+    await db.prepare(
       `UPDATE meetings SET title = @title, meeting_date = @meeting_date, meeting_time = @meeting_time, venue = @venue,
          committee_id = @committee_id, attendees = @attendees, minutes = @minutes, updated_at = CURRENT_TIMESTAMP
        WHERE id = @id`
     ).run({ ...v, id: existing.id });
-    for (const f of removed) db.prepare('DELETE FROM meeting_files WHERE id = ?').run(f.id);
-    for (const u of uploads) insertFile.run({ ...u, meeting_id: existing.id });
+    for (const f of removed) await db.prepare('DELETE FROM meeting_files WHERE id = ?').run(f.id);
+    for (const u of uploads) await insertFile.run({ ...u, meeting_id: existing.id });
   });
   for (const f of removed) removeUpload(f.file);
   flash(req, 'success', 'बैठक विवरण अपडेट किया गया।');
   res.redirect(`/admin/meetings/${existing.id}`);
 });
 
-router.post('/meetings/:id/delete', requireSuper, (req, res) => {
-  const m = getMeeting(req.params.id);
+router.post('/meetings/:id/delete', requireSuper, async (req, res) => {
+  const m = await getMeeting(req.params.id);
   if (m) {
-    db.prepare('DELETE FROM meetings WHERE id = ?').run(m.id);
+    await db.prepare('DELETE FROM meetings WHERE id = ?').run(m.id);
     for (const f of m.files) removeUpload(f.file);
     flash(req, 'success', `बैठक "${m.title}" और उसकी ${m.files.length} संलग्न फ़ाइलें हटाई गईं।`);
   }

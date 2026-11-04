@@ -35,9 +35,9 @@ export function icon(name, cls = '') {
   return `<svg class="ic ${cls}" aria-hidden="true"><use href="/img/icons.svg#${name}"></use></svg>`;
 }
 
-export function viewHelpers(req, res, next) {
-  res.locals.site = getSite();
-  res.locals.navPages = navPagesStmt.all();
+export async function viewHelpers(req, res, next) {
+  res.locals.site = await getSite();
+  res.locals.navPages = await navPagesStmt.all();
   res.locals.currentPath = req.path;
   res.locals.icon = icon;
   res.locals.formatDate = formatDate;

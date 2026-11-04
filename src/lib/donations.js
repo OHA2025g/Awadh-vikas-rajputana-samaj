@@ -45,8 +45,8 @@ function buildWhere({ category, mode, from, to, q } = {}, { isPublic = false } =
   if (q) {
     where.push(
       isPublic
-        ? `(d.anonymous = 0 AND ${DONOR_NAME} LIKE @q ESCAPE '\\')`
-        : `(${DONOR_NAME} LIKE @q ESCAPE '\\' OR m.member_no LIKE @q ESCAPE '\\' OR d.reference LIKE @q ESCAPE '\\' OR d.details LIKE @q ESCAPE '\\')`
+        ? `(d.anonymous = 0 AND ${DONOR_NAME} ILIKE @q ESCAPE E'\\\\')`
+        : `(${DONOR_NAME} ILIKE @q ESCAPE E'\\\\' OR m.member_no ILIKE @q ESCAPE E'\\\\' OR d.reference ILIKE @q ESCAPE E'\\\\' OR d.details ILIKE @q ESCAPE E'\\\\')`
     );
     params.q = likeTerm(q);
   }
@@ -55,28 +55,28 @@ function buildWhere({ category, mode, from, to, q } = {}, { isPublic = false } =
 
 const ORDER = 'ORDER BY d.paid_on DESC, d.id DESC';
 
-export function listDonations(filters, { limit = 50, offset = 0, isPublic = false } = {}) {
+export async function listDonations(filters, { limit = 50, offset = 0, isPublic = false } = {}) {
   const { sql, params } = buildWhere(filters, { isPublic });
-  const { n: total, sum } = db
+  const { n: total, sum } = await db
     .prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(d.amount_paise), 0) AS sum FROM donations d LEFT JOIN members m ON m.id = d.member_id ${sql}`)
     .get(params);
-  const rows = db.prepare(`${BASE_SELECT} ${sql} ${ORDER} LIMIT @limit OFFSET @offset`).all({ ...params, limit, offset });
+  const rows = await db.prepare(`${BASE_SELECT} ${sql} ${ORDER} LIMIT @limit OFFSET @offset`).all({ ...params, limit, offset });
   return { rows, total, sum };
 }
 
-export function allDonations(filters) {
+export async function allDonations(filters) {
   const { sql, params } = buildWhere(filters);
-  return db.prepare(`${BASE_SELECT} ${sql} ${ORDER}`).all(params);
+  return await db.prepare(`${BASE_SELECT} ${sql} ${ORDER}`).all(params);
 }
 
-export function getDonation(id) {
-  return db.prepare(`${BASE_SELECT} WHERE d.id = ?`).get(Number(id)) || null;
+export async function getDonation(id) {
+  return (await db.prepare(`${BASE_SELECT} WHERE d.id = ?`).get(Number(id))) || null;
 }
 
 /** Entry count and total (paise) per category, plus an `all` bucket, for the given date/mode filters. */
-export function donationTotals(filters = {}, opts = {}) {
+export async function donationTotals(filters = {}, opts = {}) {
   const { sql, params } = buildWhere({ ...filters, category: '' }, opts);
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT d.category AS k, COUNT(*) AS n, COALESCE(SUM(d.amount_paise), 0) AS sum
        FROM donations d LEFT JOIN members m ON m.id = d.member_id ${sql} GROUP BY d.category`

@@ -25,16 +25,16 @@ function certMember(m) {
   };
 }
 
-router.get('/certificates', (req, res) => {
-  const signatures = db.prepare('SELECT id, label, signer_name, is_default FROM signatures ORDER BY is_default DESC, id').all();
+router.get('/certificates', async (req, res) => {
+  const signatures = await db.prepare('SELECT id, label, signer_name, is_default FROM signatures ORDER BY is_default DESC, id').all();
   res.render('admin/certificates', {
     pageTitle: 'प्रमाण पत्र प्रिंटर',
-    calibration: getCalibration(),
+    calibration: await getCalibration(),
     defaults: DEFAULT_CALIBRATION,
     signatures,
-    mandals: db.prepare('SELECT id, name FROM mandals ORDER BY sort_order, id').all(),
-    nextSerial: (Number(getSetting('cert_serial_counter', 0)) || 0) + 1,
-    background: getSetting('cert_background', null),
+    mandals: await db.prepare('SELECT id, name FROM mandals ORDER BY sort_order, id').all(),
+    nextSerial: (Number(await getSetting('cert_serial_counter', 0)) || 0) + 1,
+    background: await getSetting('cert_background', null),
   });
 });
 
@@ -48,7 +48,7 @@ function idList(value) {
 
 const approvedById = db.prepare("SELECT * FROM members WHERE id = ? AND status = 'approved'");
 
-router.get('/certificates/members', (req, res) => {
+router.get('/certificates/members', async (req, res) => {
   const filters = {
     status: 'approved',
     category: CATEGORY_KEYS.includes(req.query.category) ? req.query.category : '',
@@ -59,9 +59,9 @@ router.get('/certificates/members', (req, res) => {
   };
   const ids = idList(req.query.ids);
   if (ids.length) filters.ids = ids;
-  const { rows, total } = listMembers(filters, { limit: MAX_BATCH });
-  const counts = db
-    .prepare("SELECT COUNT(*) AS total, SUM(cert_print_count > 0) AS printed FROM members WHERE status = 'approved'")
+  const { rows, total } = await listMembers(filters, { limit: MAX_BATCH });
+  const counts = await db
+    .prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN cert_print_count > 0 THEN 1 ELSE 0 END) AS printed FROM members WHERE status = 'approved'")
     .get();
   res.json({
     ok: true,
@@ -72,73 +72,74 @@ router.get('/certificates/members', (req, res) => {
 });
 
 /** Gives members their permanent certificate serial (when serials are printed) before the print dialog opens. */
-router.post('/certificates/prepare', (req, res) => {
+router.post('/certificates/prepare', async (req, res) => {
   const ids = idList(req.body?.ids);
   if (!ids.length) return res.status(422).json({ ok: false, error: 'कोई सदस्य नहीं चुना गया।' });
   const assignSerial = Boolean(req.body?.assignSerial);
-  const items = tx(() =>
-    ids
-      .map((id) => approvedById.get(id))
-      .filter(Boolean)
-      .map((m) => {
-        let serial = m.cert_serial;
-        if (assignSerial && !serial) {
-          serial = (Number(getSetting('cert_serial_counter', 0)) || 0) + 1;
-          setSetting('cert_serial_counter', serial);
-          db.prepare('UPDATE members SET cert_serial = ? WHERE id = ?').run(serial, m.id);
-        }
-        return { ...certMember(m), serial };
-      })
-  );
-  res.json({ ok: true, items, nextSerial: (Number(getSetting('cert_serial_counter', 0)) || 0) + 1 });
+  const items = await tx(async () => {
+    const out = [];
+    for (const id of ids) {
+      const m = await approvedById.get(id);
+      if (!m) continue;
+      let serial = m.cert_serial;
+      if (assignSerial && !serial) {
+        serial = (Number(await getSetting('cert_serial_counter', 0)) || 0) + 1;
+        await setSetting('cert_serial_counter', serial);
+        await db.prepare('UPDATE members SET cert_serial = ? WHERE id = ?').run(serial, m.id);
+      }
+      out.push({ ...certMember(m), serial });
+    }
+    return out;
+  });
+  res.json({ ok: true, items, nextSerial: (Number(await getSetting('cert_serial_counter', 0)) || 0) + 1 });
 });
 
 /** Records that the certificates came out of the printer. */
-router.post('/certificates/issue', (req, res) => {
+router.post('/certificates/issue', async (req, res) => {
   const ids = idList(req.body?.ids);
   if (!ids.length) return res.status(422).json({ ok: false, error: 'कोई सदस्य नहीं चुना गया।' });
-  res.json({ ok: true, count: markCertificatesPrinted(ids, req.admin.id) });
+  res.json({ ok: true, count: await markCertificatesPrinted(ids, req.admin.id) });
 });
 
-router.post('/certificates/unmark', (req, res) => {
+router.post('/certificates/unmark', async (req, res) => {
   const ids = idList(req.body?.ids);
   if (!ids.length) return res.status(422).json({ ok: false, error: 'कोई सदस्य नहीं चुना गया।' });
-  res.json({ ok: true, count: clearCertificatesPrinted(ids) });
+  res.json({ ok: true, count: await clearCertificatesPrinted(ids) });
 });
 
-router.post('/certificates/calibration', (req, res) => {
-  saveCalibration(req.body?.calibration);
-  res.json({ ok: true, calibration: getCalibration() });
+router.post('/certificates/calibration', async (req, res) => {
+  await saveCalibration(req.body?.calibration);
+  res.json({ ok: true, calibration: await getCalibration() });
 });
 
-router.post('/certificates/calibration/reset', (req, res) => {
-  setSetting('print_calibration', {});
-  res.json({ ok: true, calibration: getCalibration() });
+router.post('/certificates/calibration/reset', async (req, res) => {
+  await setSetting('print_calibration', {});
+  res.json({ ok: true, calibration: await getCalibration() });
 });
 
-router.post('/certificates/serial', (req, res) => {
+router.post('/certificates/serial', async (req, res) => {
   const next = int(req.body?.next);
   if (!next || next < 1) return res.status(422).json({ ok: false, error: 'मान्य क्रमांक लिखें।' });
-  setSetting('cert_serial_counter', next - 1);
+  await setSetting('cert_serial_counter', next - 1);
   res.json({ ok: true, nextSerial: next });
 });
 
 /** Optional scan of the blank pre-printed sheet, used as the on-screen alignment guide. */
-router.post('/certificates/background', (req, res) => {
+router.post('/certificates/background', async (req, res) => {
   const file = fileFor(req, 'background');
-  const current = getSetting('cert_background', null);
+  const current = await getSetting('cert_background', null);
   if (file) {
-    setSetting('cert_background', saveImage(file.buffer));
+    await setSetting('cert_background', saveImage(file.buffer));
     removeUpload(current);
   } else if (req.body?.remove) {
-    setSetting('cert_background', null);
+    await setSetting('cert_background', null);
     removeUpload(current);
   }
-  res.json({ ok: true, background: getSetting('cert_background', null) });
+  res.json({ ok: true, background: await getSetting('cert_background', null) });
 });
 
-router.get('/certificates/signature/:id', (req, res, next) => {
-  const sig = db.prepare('SELECT file FROM signatures WHERE id = ?').get(int(req.params.id, 0));
+router.get('/certificates/signature/:id', async (req, res, next) => {
+  const sig = await db.prepare('SELECT file FROM signatures WHERE id = ?').get(int(req.params.id, 0));
   const file = sig && privatePath(sig.file);
   if (!file) return next();
   res.set('Cache-Control', 'private, max-age=600');

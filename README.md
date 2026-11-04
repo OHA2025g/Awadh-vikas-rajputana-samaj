@@ -4,9 +4,11 @@ Hindi community website with a member directory, online membership applications,
 
 ## Quick start
 
-Requires Node.js 20 or newer.
+Requires Node.js 20 or newer and PostgreSQL 16 (local Docker is enough).
 
 ```bash
+docker compose up -d postgres
+cp .env.example .env
 npm install
 npm start
 ```
@@ -19,16 +21,23 @@ All sample text, people, events, and members are placeholders; edit or delete th
 
 ## Data and backups
 
-Everything the site writes lives in `data/`:
+Membership, donations, CMS and settings live in **PostgreSQL**. File uploads stay on disk:
 
 | Path | Contents |
 | --- | --- |
-| `data/app.db` | SQLite database (members, content, settings) |
+| PostgreSQL | Members, donations, meetings, CMS, admin users |
 | `data/uploads/` | Public images (photos, gallery, logo) |
 | `data/private/` | Applicant and authorised signatures (admin-only) |
 | `data/wa-auth/` | WhatsApp QR-gateway session |
 
-Back up the whole `data/` folder regularly. Deleting it resets the site to the sample content.
+Back up the Postgres service (EasyPanel → Postgres → Backups) **and** the `/app/data` volume. Deleting the database resets sample content on next start.
+
+To copy an old local `data/app.db` into Postgres once:
+
+```bash
+npm i -D better-sqlite3
+DATABASE_URL=postgres://arvs:arvs@localhost:5432/arvs node scripts/migrate-sqlite-to-pg.mjs
+```
 
 ## Certificate printer (प्रमाण पत्र प्रिंटर)
 
@@ -55,6 +64,27 @@ Sub-admins only ever see masked phone numbers (`+91 98******12`), including in C
 
 ## Deployment notes
 
-- Run behind HTTPS (e.g. Nginx + Let's Encrypt) and set `COOKIE_SECURE=true` and `TRUST_PROXY=1`.
-- Keep the process alive with a supervisor such as `pm2 start server.js --name arvs`.
+- Run behind HTTPS (e.g. Nginx + Let's Encrypt / EasyPanel) and set `COOKIE_SECURE=true` and `TRUST_PROXY=1`.
 - The QR gateway needs a long-running server (a VPS); it will not work on serverless hosting.
+
+### EasyPanel (App + Postgres)
+
+1. Create a **PostgreSQL** service. Note its user, password, database name and internal hostname.
+2. Create an **App** from this repo's `Dockerfile`. Mount a volume on `/app/data` (uploads / WhatsApp only).
+3. On the App, set environment variables from the Postgres service — either one URL or split fields:
+
+```
+DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DB_NAME
+```
+
+or:
+
+```
+DB_HOST=<postgres service host>
+DB_PORT=5432
+DB_NAME=<database name>
+DB_USER=<user>
+DB_PASSWORD=<password>
+```
+
+`DB_URL` is accepted as an alias of `DATABASE_URL`. You can keep replicas above 1 for the App; keep a single Postgres service.

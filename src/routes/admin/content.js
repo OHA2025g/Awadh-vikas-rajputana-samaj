@@ -15,14 +15,14 @@ export const ICON_CHOICES = ['book-open', 'heart', 'flag', 'users', 'award', 'st
 
 const SITE_TEXT_FIELDS = Object.keys(DEFAULT_SITE).filter((k) => !['logo', 'hero_image', 'wall_member_posts'].includes(k));
 
-router.get('/site', (req, res) => {
-  res.render('admin/site', { pageTitle: 'संस्था एवं वेबसाइट सेटिंग', s: getSite() });
+router.get('/site', async (req, res) => {
+  res.render('admin/site', { pageTitle: 'संस्था एवं वेबसाइट सेटिंग', s: await getSite() });
 });
 
-router.post('/site', (req, res) => {
+router.post('/site', async (req, res) => {
   const body = req.body ?? {};
-  const current = getSite();
-  const saved = { ...getSetting('site', {}) };
+  const current = await getSite();
+  const saved = { ...await getSetting('site', {}) };
   for (const key of SITE_TEXT_FIELDS) {
     const max = ['hero_subtitle', 'footer_about', 'address'].includes(key) ? 600 : 200;
     saved[key] = key === 'map_embed' ? cleanMapUrl(body[key]) : text(body[key], max);
@@ -39,7 +39,7 @@ router.post('/site', (req, res) => {
       delete saved[key];
     }
   }
-  setSetting('site', saved);
+  await setSetting('site', saved);
   flash(req, 'success', 'वेबसाइट सेटिंग सहेजी गई।');
   res.redirect('/admin/site');
 });
@@ -71,12 +71,12 @@ const BLOCK_MANAGE_LINKS = {
   contact: ['/admin/site', 'संपर्क विवरण बदलें'],
 };
 
-router.get('/sections', (req, res) => {
-  const sections = db.prepare('SELECT * FROM sections ORDER BY sort_order, id').all();
+router.get('/sections', async (req, res) => {
+  const sections = await db.prepare('SELECT * FROM sections ORDER BY sort_order, id').all();
   res.render('admin/sections', { pageTitle: 'अनुभाग एवं पेज (CMS)', sections });
 });
 
-router.get('/sections/new', (req, res) => {
+router.get('/sections/new', async (req, res) => {
   res.render('admin/section-form', {
     pageTitle: 'नया अनुभाग / पेज',
     s: { kind: 'custom', layout: 'image-right', show_on_home: 1, has_page: 0, show_in_nav: 0, visible: 1 },
@@ -86,7 +86,7 @@ router.get('/sections/new', (req, res) => {
   });
 });
 
-function parseSection(body, existing) {
+async function parseSection(body, existing) {
   const isCustom = !existing || existing.kind === 'custom';
   const v = {
     title: str(body.title, 150),
@@ -107,7 +107,7 @@ function parseSection(body, existing) {
   }
   const errors = v.title ? [] : ['शीर्षक आवश्यक है।'];
   if (isCustom) {
-    const clash = db.prepare('SELECT id FROM sections WHERE slug = ? AND id != ?').get(v.slug, existing?.id ?? 0);
+    const clash = await db.prepare('SELECT id FROM sections WHERE slug = ? AND id != ?').get(v.slug, existing?.id ?? 0);
     if (clash) errors.push('यह URL नाम (slug) पहले से उपयोग में है।');
   }
   return { v, errors };
@@ -124,23 +124,23 @@ function applySectionImage(req, v, existing) {
   }
 }
 
-router.post('/sections', (req, res) => {
-  const { v, errors } = parseSection(req.body ?? {}, null);
+router.post('/sections', async (req, res) => {
+  const { v, errors } = await parseSection(req.body ?? {}, null);
   if (errors.length) {
     return res.render('admin/section-form', { pageTitle: 'नया अनुभाग / पेज', s: { kind: 'custom', ...v }, bodyLabels: ['विवरण'], manage: null, errors });
   }
   applySectionImage(req, v, null);
-  const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS n FROM sections').get().n;
+  const maxOrder = (await db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS n FROM sections').get()).n;
   const cols = Object.keys(v);
-  const info = db
+  const info = await db
     .prepare(`INSERT INTO sections (kind, sort_order, updated_at, ${cols.join(', ')}) VALUES ('custom', @sort_order, CURRENT_TIMESTAMP, ${cols.map((c) => `@${c}`).join(', ')})`)
     .run({ ...v, sort_order: maxOrder + 10 });
   flash(req, 'success', 'नया अनुभाग बनाया गया।');
   res.redirect(`/admin/sections/${info.lastInsertRowid}/edit`);
 });
 
-router.get('/sections/:id/edit', (req, res, next) => {
-  const s = db.prepare('SELECT * FROM sections WHERE id = ?').get(int(req.params.id, 0));
+router.get('/sections/:id/edit', async (req, res, next) => {
+  const s = await db.prepare('SELECT * FROM sections WHERE id = ?').get(int(req.params.id, 0));
   if (!s) return next();
   res.render('admin/section-form', {
     pageTitle: `अनुभाग संपादन — ${s.title}`,
@@ -151,10 +151,10 @@ router.get('/sections/:id/edit', (req, res, next) => {
   });
 });
 
-router.post('/sections/:id', (req, res, next) => {
-  const existing = db.prepare('SELECT * FROM sections WHERE id = ?').get(int(req.params.id, 0));
+router.post('/sections/:id', async (req, res, next) => {
+  const existing = await db.prepare('SELECT * FROM sections WHERE id = ?').get(int(req.params.id, 0));
   if (!existing) return next();
-  const { v, errors } = parseSection(req.body ?? {}, existing);
+  const { v, errors } = await parseSection(req.body ?? {}, existing);
   if (errors.length) {
     return res.render('admin/section-form', {
       pageTitle: `अनुभाग संपादन — ${existing.title}`,
@@ -166,7 +166,7 @@ router.post('/sections/:id', (req, res, next) => {
   }
   if (existing.kind !== 'block') applySectionImage(req, v, existing);
   const cols = Object.keys(v);
-  db.prepare(`UPDATE sections SET ${cols.map((c) => `${c} = @${c}`).join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = @id`).run({
+  await db.prepare(`UPDATE sections SET ${cols.map((c) => `${c} = @${c}`).join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = @id`).run({
     ...v,
     id: existing.id,
   });
@@ -174,10 +174,10 @@ router.post('/sections/:id', (req, res, next) => {
   res.redirect(`/admin/sections/${existing.id}/edit`);
 });
 
-router.post('/sections/:id/delete', (req, res) => {
-  const s = db.prepare('SELECT * FROM sections WHERE id = ?').get(int(req.params.id, 0));
+router.post('/sections/:id/delete', async (req, res) => {
+  const s = await db.prepare('SELECT * FROM sections WHERE id = ?').get(int(req.params.id, 0));
   if (s?.kind === 'custom') {
-    db.prepare('DELETE FROM sections WHERE id = ?').run(s.id);
+    await db.prepare('DELETE FROM sections WHERE id = ?').run(s.id);
     removeUpload(s.image);
     flash(req, 'success', 'अनुभाग हटाया गया।');
   } else {
@@ -186,31 +186,31 @@ router.post('/sections/:id/delete', (req, res) => {
   res.redirect('/admin/sections');
 });
 
-router.post('/sections/:id/toggle', (req, res) => {
-  db.prepare('UPDATE sections SET visible = 1 - visible WHERE id = ?').run(int(req.params.id, 0));
+router.post('/sections/:id/toggle', async (req, res) => {
+  await db.prepare('UPDATE sections SET visible = 1 - visible WHERE id = ?').run(int(req.params.id, 0));
   res.redirect('/admin/sections');
 });
 
-router.post('/sections/:id/move', (req, res) => {
-  moveRow('sections', null, int(req.params.id, 0), req.body?.dir === 'up' ? -1 : 1);
+router.post('/sections/:id/move', async (req, res) => {
+  await moveRow('sections', null, int(req.params.id, 0), req.body?.dir === 'up' ? -1 : 1);
   res.redirect('/admin/sections');
 });
 
 /** Swap a row with its neighbour and renumber sort_order within the (optional) group. */
-function moveRow(table, groupField, id, delta) {
-  tx(() => {
-    const row = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+async function moveRow(table, groupField, id, delta) {
+  await tx(async () => {
+    const row = await db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
     if (!row) return;
     const rows = groupField
-      ? db.prepare(`SELECT id FROM ${table} WHERE ${groupField} = ? ORDER BY sort_order, id`).all(row[groupField])
-      : db.prepare(`SELECT id FROM ${table} ORDER BY sort_order, id`).all();
+      ? await db.prepare(`SELECT id FROM ${table} WHERE ${groupField} = ? ORDER BY sort_order, id`).all(row[groupField])
+      : await db.prepare(`SELECT id FROM ${table} ORDER BY sort_order, id`).all();
     const ids = rows.map((r) => r.id);
     const i = ids.indexOf(id);
     const j = i + delta;
     if (i < 0 || j < 0 || j >= ids.length) return;
     [ids[i], ids[j]] = [ids[j], ids[i]];
     const upd = db.prepare(`UPDATE ${table} SET sort_order = ? WHERE id = ?`);
-    ids.forEach((rid, idx) => upd.run((idx + 1) * 10, rid));
+    for (const [idx, rid] of ids.entries()) await upd.run((idx + 1) * 10, rid);
   });
 }
 
@@ -405,58 +405,58 @@ function applyFiles(r, req, values, existing) {
   }
 }
 
-router.get('/r/:res', resource, (req, res) => {
+router.get('/r/:res', resource, async (req, res) => {
   const r = req.resource;
-  const rows = db.prepare(`SELECT * FROM ${r.table} ORDER BY ${r.orderBy}`).all();
+  const rows = await db.prepare(`SELECT * FROM ${r.table} ORDER BY ${r.orderBy}`).all();
   res.render('admin/crud-list', { pageTitle: r.title, rows });
 });
 
-router.get('/r/:res/new', resource, (req, res) => {
+router.get('/r/:res/new', resource, async (req, res) => {
   const row = Object.fromEntries(req.resource.fields.map((f) => [f.name, f.default ?? (f.type === 'select' ? req.query[f.name] || '' : '')]));
   res.render('admin/crud-form', { pageTitle: `नया ${req.resource.singular}`, row, errors: [] });
 });
 
-router.post('/r/:res', resource, (req, res) => {
+router.post('/r/:res', resource, async (req, res) => {
   const r = req.resource;
   const { values, errors } = parseFields(r, req);
   if (errors.length) return res.render('admin/crud-form', { pageTitle: `नया ${r.singular}`, row: values, errors });
   applyFiles(r, req, values, null);
   if (r.sortable) {
     values.sort_order =
-      db
+      (await db
         .prepare(`SELECT COALESCE(MAX(sort_order), 0) AS n FROM ${r.table}${r.groupField ? ` WHERE ${r.groupField} = ?` : ''}`)
-        .get(...(r.groupField ? [values[r.groupField]] : [])).n + 10;
+        .get(...(r.groupField ? [values[r.groupField]] : []))).n + 10;
   }
   const cols = Object.keys(values);
-  db.prepare(`INSERT INTO ${r.table} (${cols.join(', ')}) VALUES (${cols.map((c) => `@${c}`).join(', ')})`).run(values);
+  await db.prepare(`INSERT INTO ${r.table} (${cols.join(', ')}) VALUES (${cols.map((c) => `@${c}`).join(', ')})`).run(values);
   flash(req, 'success', `${r.singular} जोड़ा गया।`);
   res.redirect(`/admin/r/${req.params.res}`);
 });
 
-router.get('/r/:res/:id/edit', resource, (req, res, next) => {
-  const row = db.prepare(`SELECT * FROM ${req.resource.table} WHERE id = ?`).get(int(req.params.id, 0));
+router.get('/r/:res/:id/edit', resource, async (req, res, next) => {
+  const row = await db.prepare(`SELECT * FROM ${req.resource.table} WHERE id = ?`).get(int(req.params.id, 0));
   if (!row) return next();
   res.render('admin/crud-form', { pageTitle: `${req.resource.singular} संपादन`, row, errors: [] });
 });
 
-router.post('/r/:res/:id', resource, (req, res, next) => {
+router.post('/r/:res/:id', resource, async (req, res, next) => {
   const r = req.resource;
-  const existing = db.prepare(`SELECT * FROM ${r.table} WHERE id = ?`).get(int(req.params.id, 0));
+  const existing = await db.prepare(`SELECT * FROM ${r.table} WHERE id = ?`).get(int(req.params.id, 0));
   if (!existing) return next();
   const { values, errors } = parseFields(r, req);
   if (errors.length) return res.render('admin/crud-form', { pageTitle: `${r.singular} संपादन`, row: { ...existing, ...values }, errors });
   applyFiles(r, req, values, existing);
   const cols = Object.keys(values);
-  db.prepare(`UPDATE ${r.table} SET ${cols.map((c) => `${c} = @${c}`).join(', ')} WHERE id = @id`).run({ ...values, id: existing.id });
+  await db.prepare(`UPDATE ${r.table} SET ${cols.map((c) => `${c} = @${c}`).join(', ')} WHERE id = @id`).run({ ...values, id: existing.id });
   flash(req, 'success', 'परिवर्तन सहेजे गए।');
   res.redirect(`/admin/r/${req.params.res}`);
 });
 
-router.post('/r/:res/:id/delete', resource, (req, res) => {
+router.post('/r/:res/:id/delete', resource, async (req, res) => {
   const r = req.resource;
-  const row = db.prepare(`SELECT * FROM ${r.table} WHERE id = ?`).get(int(req.params.id, 0));
+  const row = await db.prepare(`SELECT * FROM ${r.table} WHERE id = ?`).get(int(req.params.id, 0));
   if (row) {
-    db.prepare(`DELETE FROM ${r.table} WHERE id = ?`).run(row.id);
+    await db.prepare(`DELETE FROM ${r.table} WHERE id = ?`).run(row.id);
     for (const f of r.fields) {
       if (f.type === 'image') removeUpload(row[f.name]);
       if (f.type === 'gallery') {
@@ -472,9 +472,9 @@ router.post('/r/:res/:id/delete', resource, (req, res) => {
   res.redirect(`/admin/r/${req.params.res}`);
 });
 
-router.post('/r/:res/:id/move', resource, (req, res) => {
+router.post('/r/:res/:id/move', resource, async (req, res) => {
   const r = req.resource;
-  if (r.sortable) moveRow(r.table, r.groupField || null, int(req.params.id, 0), req.body?.dir === 'up' ? -1 : 1);
+  if (r.sortable) await moveRow(r.table, r.groupField || null, int(req.params.id, 0), req.body?.dir === 'up' ? -1 : 1);
   res.redirect(`/admin/r/${req.params.res}`);
 });
 
