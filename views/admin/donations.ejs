@@ -12,6 +12,8 @@
   const pageUrl = (n) => '/admin/donations?' + (qs ? qs + '&' : '') + 'page=' + n;
   const current = filters.category ? totals[filters.category] : totals.all;
   const hasFilters = filters.mode || filters.from || filters.to || filters.q;
+  const fixedFee = filters.category === 'lifetime';
+  const showPhone = isSuper ? formatPhone : maskPhone;
 %>
 
 <div class="grid cols-4 stat-money" style="margin-bottom:18px">
@@ -49,7 +51,7 @@
   <div class="card-body bulk-bar">
     <span>
       <b><%= filters.category ? DONATION_CATEGORY_LABEL[filters.category] : 'सभी श्रेणियाँ' %></b><%= hasFilters ? ' (फ़िल्टर लागू)' : '' %>
-      <span class="muted small"> — कुल <b><%= entryCount(current.n) %></b> • कुल राशि <b class="don-total"><%= formatINR(current.sum) %></b></span>
+      <span class="muted small"> — <% if (fixedFee) { %>निर्धारित शुल्क <b><%= formatINR(LIFETIME_FEE_PAISE) %></b> प्रति सदस्य • <% } %>कुल <b><%= entryCount(current.n) %></b> • कुल राशि <b class="don-total"><%= formatINR(current.sum) %></b></span>
     </span>
     <div class="actions">
       <a class="btn btn-outline btn-sm" href="/admin/donations/export.csv<%= qs ? '?' + qs : '' %>"><%- icon('download') %> CSV</a>
@@ -66,7 +68,7 @@
           <th>दिनांक</th>
           <th>सदस्य</th>
           <% if (!filters.category) { %><th>श्रेणी</th><% } %>
-          <th style="text-align:right">राशि</th>
+          <% if (!fixedFee) { %><th style="text-align:right">राशि</th><% } %>
           <th>भुगतान प्रकार</th>
           <th>संदर्भ / विवरण</th>
           <th>प्रविष्टि</th>
@@ -75,7 +77,7 @@
       </thead>
       <tbody>
         <% if (!rows.length) { %>
-          <tr><td colspan="9"><div class="empty-state"><%- icon('gift') %><p>इस फ़िल्टर में कोई प्रविष्टि नहीं मिली।</p>
+          <tr><td colspan="<%= 8 + (filters.category ? 0 : 1) - (fixedFee ? 1 : 0) %>"><div class="empty-state"><%- icon('gift') %><p>इस फ़िल्टर में कोई प्रविष्टि नहीं मिली।</p>
             <a class="btn btn-primary btn-sm" href="/admin/donations/new<%= filters.category ? '?category=' + filters.category : '' %>"><%- icon('plus') %> पहली प्रविष्टि जोड़ें</a></div></td></tr>
         <% } %>
         <% rows.forEach((d, i) => { %>
@@ -84,12 +86,13 @@
             <td class="nowrap"><%= formatDate(d.paid_on, 'short') %></td>
             <td>
               <div class="cell-main"><%= d.name %>
-                <% if (d.anonymous) { %><span class="badge gray" title="वेबसाइट पर नाम नहीं दिखेगा">गुप्त दान</span><% } %>
+                <% if (d.anonymous) { %><span class="badge gray" title="वेबसाइट पर नाम नहीं दिखेगा">गुप्त सहयोग</span><% } %>
               </div>
               <div class="cell-sub mono"><%= d.member_no || (d.member_id ? '' : 'सदस्य हटाया गया') %></div>
+              <% if (d.phone) { %><div class="cell-sub mono" title="केवल एडमिन पैनल में दिखता है"><%- icon('phone') %> <%= showPhone(d.phone) %></div><% } %>
             </td>
             <% if (!filters.category) { %><td><span class="badge <%= catBadge[d.category] %>"><%= DONATION_CATEGORY_LABEL[d.category] %></span></td><% } %>
-            <td class="nowrap" style="text-align:right"><b class="don-total"><%= formatINR(d.amount_paise) %></b></td>
+            <% if (!fixedFee) { %><td class="nowrap" style="text-align:right"><b class="don-total"><%= formatINR(d.amount_paise) %></b></td><% } %>
             <td class="nowrap"><%= PAYMENT_MODE_LABEL[d.payment_mode] %></td>
             <td>
               <% if (d.reference) { %><div class="mono small"><%= d.reference %></div><% } %>
@@ -128,6 +131,6 @@
   <% } %>
 </div>
 
-<p class="muted small" style="margin-top:12px"><%- icon('info') %> सार्वजनिक "दान" पृष्ठ पर नाम, राशि, भुगतान प्रकार, दिनांक, विवरण तथा संदर्भ संख्या के केवल अंतिम 4 अंक दिखते हैं। गुप्त दान में नाम नहीं दिखता।<% if (!isSuper) { %> प्रविष्टि हटाने का अधिकार केवल मुख्य एडमिन को है।<% } %></p>
+<p class="muted small" style="margin-top:12px"><%- icon('info') %> सार्वजनिक "सहयोग" पृष्ठ पर नाम, राशि, भुगतान प्रकार, दिनांक, विवरण तथा संदर्भ संख्या के केवल अंतिम 4 अंक दिखते हैं। गुप्त सहयोग में नाम नहीं दिखता। सहयोगकर्ता का मोबाइल नंबर केवल एडमिन पैनल में दिखता है, वेबसाइट पर नहीं।<% if (!isSuper) { %> प्रविष्टि हटाने का अधिकार केवल मुख्य एडमिन को है।<% } %></p>
 
 <%- include('../partials/admin-bottom') %>

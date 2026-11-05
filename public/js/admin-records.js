@@ -135,7 +135,7 @@
         searchBox.hidden = true;
         lifetimePaid = Boolean(m.lifetime_paid);
         updateWarn();
-        $('#f-amount')?.focus();
+        if (!$('#f-amount').disabled) $('#f-amount').focus();
       },
     });
 
@@ -149,7 +149,23 @@
       input.focus();
     });
 
-    $$('input[name="category"]', form).forEach((r) => r.addEventListener('change', updateWarn));
+    const amountField = $('[data-amount-field]', form);
+    const amountInput = $('#f-amount', form);
+    const fixedFee = $('[data-fixed-fee]', form);
+    const phoneField = $('[data-phone-field]', form);
+    const phoneInput = $('#f-phone', form);
+    const updateCategory = () => {
+      const category = $('input[name="category"]:checked', form)?.value;
+      const isLifetime = category === 'lifetime';
+      amountField.hidden = isLifetime;
+      amountInput.disabled = isLifetime;
+      amountInput.required = !isLifetime;
+      fixedFee.hidden = !isLifetime;
+      phoneField.hidden = category !== 'daan';
+      phoneInput.disabled = category !== 'daan';
+      updateWarn();
+    };
+    $$('input[name="category"]', form).forEach((r) => r.addEventListener('change', updateCategory));
 
     form.addEventListener('submit', (e) => {
       if (!searchBox.hidden) {

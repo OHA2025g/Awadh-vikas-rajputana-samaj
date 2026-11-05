@@ -1,7 +1,10 @@
 <%- include('../partials/admin-top') %>
-<% const isNew = !d.id; %>
+<%
+  const isNew = !d.id;
+  const fixedFee = d.category === 'lifetime';
+%>
 
-<p><a href="/admin/donations<%= d.category ? '?category=' + d.category : '' %>"><%- icon('chevron-left') %> दान एवं भुगतान</a></p>
+<p><a href="/admin/donations<%= d.category ? '?category=' + d.category : '' %>"><%- icon('chevron-left') %> सहयोग एवं भुगतान</a></p>
 
 <% if (errors.length) { %>
   <div class="flash error"><%- icon('alert') %> <span><%= errors.join(' ') %></span></div>
@@ -43,17 +46,28 @@
       </div>
     </div>
 
-    <div class="field">
+    <div class="field" data-amount-field <%= fixedFee ? 'hidden' : '' %>>
       <label for="f-amount">राशि (₹) <span class="req">*</span></label>
       <div class="input-prefix">
         <span>₹</span>
-        <input type="text" id="f-amount" name="amount" value="<%= d.amount %>" inputmode="decimal" maxlength="15" placeholder="जैसे 1100" required pattern="[0-9,]+(\.[0-9]{1,2})?">
+        <input type="text" id="f-amount" name="amount" value="<%= fixedFee ? '' : d.amount %>" inputmode="decimal" maxlength="15" placeholder="जैसे 1100" pattern="[0-9,]+(\.[0-9]{1,2})?" <%= fixedFee ? 'disabled' : 'required' %>>
       </div>
+    </div>
+
+    <div class="field" data-fixed-fee <%= fixedFee ? '' : 'hidden' %>>
+      <span class="label">राशि (₹)</span>
+      <div class="flash info"><%- icon('info') %> <span>आजीवन सदस्यता शुल्क <b><%= formatINR(LIFETIME_FEE_PAISE) %></b> निर्धारित है — राशि अपने आप दर्ज होगी।</span></div>
     </div>
 
     <div class="field">
       <label for="f-paid-on">भुगतान की तिथि <span class="req">*</span></label>
       <input type="date" id="f-paid-on" name="paid_on" value="<%= d.paid_on %>" max="<%= today %>" required>
+    </div>
+
+    <div class="field" data-phone-field <%= d.category === 'daan' ? '' : 'hidden' %>>
+      <label for="f-phone">मोबाइल नंबर</label>
+      <input type="tel" id="f-phone" name="phone" value="<%= d.phone || '' %>" inputmode="numeric" maxlength="14" placeholder="10 अंकों का मोबाइल नंबर" autocomplete="off" <%= d.category === 'daan' ? '' : 'disabled' %>>
+      <div class="hint"><%- icon('lock') %> यह नंबर केवल एडमिन पैनल में दिखेगा, वेबसाइट पर नहीं।</div>
     </div>
 
     <div class="field span-all">
@@ -74,11 +88,11 @@
     <div class="field">
       <label for="f-details">लेन-देन विवरण / टिप्पणी</label>
       <input type="text" id="f-details" name="details" value="<%= d.details || '' %>" maxlength="200" placeholder="जैसे: होली मिलन समारोह 2026 हेतु">
-      <div class="hint">यह विवरण वेबसाइट के दान पृष्ठ पर दिखेगा।</div>
+      <div class="hint">यह विवरण वेबसाइट के सहयोग पृष्ठ पर दिखेगा।</div>
     </div>
 
     <div class="field span-all">
-      <label class="check"><input type="checkbox" name="anonymous" value="1" <%= Number(d.anonymous) ? 'checked' : '' %>> गुप्त दान — वेबसाइट पर सदस्य का नाम न दिखाएँ</label>
+      <label class="check"><input type="checkbox" name="anonymous" value="1" <%= Number(d.anonymous) ? 'checked' : '' %>> गुप्त सहयोग — वेबसाइट पर सदस्य का नाम न दिखाएँ</label>
     </div>
   </div>
   <div class="form-actions">

@@ -415,6 +415,7 @@ async function initSchema() {
     family: "TEXT NOT NULL DEFAULT '[]'",
     relatives: "TEXT NOT NULL DEFAULT '[]'",
   });
+  await ensureColumns('donations', { phone: 'TEXT' });
 }
 
 await initSchema();

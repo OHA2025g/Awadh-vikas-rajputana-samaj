@@ -9,6 +9,7 @@ import {
   ROLE_LABEL,
   DONATION_CATEGORIES,
   DONATION_CATEGORY_LABEL,
+  LIFETIME_FEE_PAISE,
   PAYMENT_MODES,
   PAYMENT_MODE_LABEL,
 } from '../config.js';
@@ -60,6 +61,7 @@ export async function viewHelpers(req, res, next) {
   res.locals.ROLE_LABEL = ROLE_LABEL;
   res.locals.DONATION_CATEGORIES = DONATION_CATEGORIES;
   res.locals.DONATION_CATEGORY_LABEL = DONATION_CATEGORY_LABEL;
+  res.locals.LIFETIME_FEE_PAISE = LIFETIME_FEE_PAISE;
   res.locals.PAYMENT_MODES = PAYMENT_MODES;
   res.locals.PAYMENT_MODE_LABEL = PAYMENT_MODE_LABEL;
   res.locals.formatINR = formatINR;

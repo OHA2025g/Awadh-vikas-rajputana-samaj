@@ -40,12 +40,15 @@ export const ROLE_LABEL = { superadmin: 'मुख्य एडमिन', subad
 
 export const DONATION_CATEGORIES = [
   { key: 'lifetime', label: 'आजीवन सदस्यता शुल्क', icon: 'award' },
-  { key: 'daan', label: 'दान', icon: 'heart' },
+  { key: 'daan', label: 'सहयोग', icon: 'heart' },
   { key: 'aayojan', label: 'आयोजन सहयोग', icon: 'calendar' },
   { key: 'other', label: 'अन्य', icon: 'gift' },
 ];
 export const DONATION_CATEGORY_KEYS = DONATION_CATEGORIES.map((c) => c.key);
 export const DONATION_CATEGORY_LABEL = Object.fromEntries(DONATION_CATEGORIES.map((c) => [c.key, c.label]));
+
+/** आजीवन सदस्यता शुल्क is one fixed amount; every other category is entered per receipt. */
+export const LIFETIME_FEE_PAISE = 600 * 100;
 
 export const PAYMENT_MODES = [
   { key: 'cash', label: 'नकद (Cash)' },

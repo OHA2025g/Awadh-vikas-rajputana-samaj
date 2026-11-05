@@ -22,7 +22,7 @@ export function donationFilters(query = {}) {
   };
 }
 
-/** The public page searches donor names only, and never matches a गुप्त दान entry. */
+/** The public page searches donor names only, and never matches a गुप्त सहयोग entry. */
 function buildWhere({ category, mode, from, to, q } = {}, { isPublic = false } = {}) {
   const where = [];
   const params = {};
@@ -46,7 +46,7 @@ function buildWhere({ category, mode, from, to, q } = {}, { isPublic = false } =
     where.push(
       isPublic
         ? `(d.anonymous = 0 AND ${DONOR_NAME} ILIKE @q ESCAPE E'\\\\')`
-        : `(${DONOR_NAME} ILIKE @q ESCAPE E'\\\\' OR m.member_no ILIKE @q ESCAPE E'\\\\' OR d.reference ILIKE @q ESCAPE E'\\\\' OR d.details ILIKE @q ESCAPE E'\\\\')`
+        : `(${DONOR_NAME} ILIKE @q ESCAPE E'\\\\' OR m.member_no ILIKE @q ESCAPE E'\\\\' OR d.reference ILIKE @q ESCAPE E'\\\\' OR d.details ILIKE @q ESCAPE E'\\\\' OR d.phone ILIKE @q ESCAPE E'\\\\')`
     );
     params.q = likeTerm(q);
   }

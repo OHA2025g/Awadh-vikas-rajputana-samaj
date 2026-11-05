@@ -91,7 +91,7 @@ const DONATIONS_PER_PAGE = 50;
 
 function toPublicDonation(d) {
   return {
-    name: d.anonymous ? 'गुप्त दान' : d.name,
+    name: d.anonymous ? 'गुप्त सहयोग' : d.name,
     anonymous: Boolean(d.anonymous),
     amount: formatINR(d.amount_paise),
     mode: PAYMENT_MODE_LABEL[d.payment_mode] || '',
@@ -108,7 +108,7 @@ router.get('/donations', async (req, res) => {
   const pg = paginate(totals[filters.category].n, int(req.query.page), DONATIONS_PER_PAGE);
   const { rows } = await listDonations(filters, { limit: DONATIONS_PER_PAGE, offset: pg.offset, isPublic: true });
   res.render('public/donations', {
-    pageTitle: 'दान एवं सहयोग',
+    pageTitle: 'सहयोग',
     filters,
     totals,
     pg,
