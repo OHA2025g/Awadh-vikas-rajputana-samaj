@@ -28,6 +28,9 @@ import {
   formatAadhaar,
   formatDate,
   csvCell,
+  isISODate,
+  todayISO,
+  isoDate,
 } from '../../lib/util.js';
 
 const router = express.Router();
@@ -161,6 +164,12 @@ function parseMember(body, isSuper) {
     delete v.relatives;
   }
   const errors = Object.values(fieldErrors);
+  // Only the admin member form posts this. The public join page keeps today's date.
+  if (Object.prototype.hasOwnProperty.call(body, 'form_date')) {
+    const raw = String(body.form_date || '').trim();
+    if (!isISODate(raw) || raw > todayISO()) errors.push('दिनांक आज की तारीख या उससे पहले चुनें।');
+    else v.created_at = raw;
+  }
   if (isSuper) {
     v.phone = normalizePhone(body.phone);
     v.whatsapp = normalizePhone(body.whatsapp) || v.phone;
@@ -169,12 +178,22 @@ function parseMember(body, isSuper) {
   return { v, errors };
 }
 
+function formStamp(m) {
+  const picked = isISODate(m.form_date) ? m.form_date : '';
+  const iso = picked || isoDate(m.created_at) || todayISO();
+  return {
+    formDate: formatDate(iso, 'numeric'),
+    formDateIso: iso,
+    formDateMax: todayISO(),
+  };
+}
+
 async function renderForm(res, m, extra = {}) {
   res.render('admin/member-form', {
     pageTitle: m.id ? `सदस्य संपादन — ${m.name}` : 'नया सदस्य जोड़ें',
     extraStyles: ['/css/membership-form.css'],
     m,
-    formDate: formatDate(m.created_at || new Date(), 'numeric'),
+    ...formStamp(m),
     mandals: await mandals(),
     committees: await committees(),
     SALUTATIONS,
@@ -198,6 +217,7 @@ router.post('/members', requireSuper, async (req, res) => {
   const photo = photoFile ? saveImage(photoFile.buffer) : null;
   const id = await tx(async () => {
     const row = { ...v, photo };
+    if (v.created_at) row.approved_at = v.created_at;
     const cols = Object.keys(row);
     const info = await db
       .prepare(`INSERT INTO members (status, ${cols.join(', ')}) VALUES ('pending', ${cols.map((c) => `@${c}`).join(', ')})`)
@@ -293,7 +313,7 @@ router.post('/members/:id', async (req, res, next) => {
       .get(v.phone, existing.id);
     if (dup) errors.push('यह मोबाइल नंबर किसी अन्य सदस्य के नाम पर है।');
   }
-  if (errors.length) return await renderForm(res, { ...existing, ...v }, { errors });
+  if (errors.length) return await renderForm(res, { ...existing, ...v, form_date: body.form_date }, { errors });
 
   let photo = existing.photo;
   const photoFile = fileFor(req, 'photo');

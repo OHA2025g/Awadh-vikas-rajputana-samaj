@@ -31,7 +31,7 @@
           <div class="flash info" style="margin:14px 20px 0"><%- icon('lock') %> <span>मोबाइल, आधार नंबर व परिवार / रिलेशन की तालिकाएँ केवल मुख्य एडमिन बदल सकते हैं।</span></div>
         <% } %>
         <div class="card-body">
-          <%- include('../partials/membership-form', { mf: { mode: 'edit', m, secure: isSuper, dateText: formDate } }) %>
+          <%- include('../partials/membership-form', { mf: { mode: 'edit', m, secure: isSuper, dateText: formDate, dateEditable: true, dateValue: formDateIso, dateMax: formDateMax } }) %>
         </div>
       </section>
 

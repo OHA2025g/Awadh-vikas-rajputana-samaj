@@ -278,6 +278,19 @@ label.mf-photo {
   min-height: 0;
 }
 
+.mf-paper input.mf-date {
+  flex: 0 1 168px;
+  width: 168px;
+  max-width: 100%;
+  min-height: 32px;
+  color-scheme: light;
+}
+
+.mf-meta input.mf-date {
+  display: inline-block;
+  vertical-align: middle;
+}
+
 .mf-paper textarea.mf-in {
   resize: vertical;
   line-height: 30px;

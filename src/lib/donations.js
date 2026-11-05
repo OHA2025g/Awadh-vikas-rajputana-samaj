@@ -7,9 +7,11 @@ const DONOR_NAME = `COALESCE(TRIM(COALESCE(m.salutation, '') || ' ' || m.name), 
 
 const BASE_SELECT = `
   SELECT d.*, ${DONOR_NAME} AS name, m.member_no, m.status AS member_status,
+         m.phone AS member_phone, md.name AS mandal_name,
          a.name AS admin_name, a.username AS admin_username
   FROM donations d
   LEFT JOIN members m ON m.id = d.member_id
+  LEFT JOIN mandals md ON md.id = m.mandal_id
   LEFT JOIN admins a ON a.id = COALESCE(d.updated_by, d.admin_id)`;
 
 export function donationFilters(query = {}) {

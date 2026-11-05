@@ -127,6 +127,13 @@ export function todayISO() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
 }
 
+/** Calendar date in Asia/Kolkata as YYYY-MM-DD, for `<input type="date">`. */
+export function isoDate(value) {
+  const d = parseDate(value);
+  if (!d) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(d);
+}
+
 export function relativeTime(value) {
   const d = parseDate(value);
   if (!d) return '';

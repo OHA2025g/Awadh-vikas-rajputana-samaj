@@ -5,9 +5,12 @@
    *   mf.m         member / application row (or {} for a blank form)
    *   mf.secure    full mobile + Aadhaar numbers visible and editable (applicant, main admin)
    *   mf.applicant public application: photo upload, signature pad, declaration checkbox
-   *   mf.dateText  the form's दिनांक
+   *   mf.dateText     the form's दिनांक, shown as text
+   *   mf.dateEditable admin only: दिनांक is an editable date (public join stays fixed)
+   *   mf.dateValue    YYYY-MM-DD for that input
+   *   mf.dateMax      latest allowed YYYY-MM-DD
    */
-  const { mode = 'view', m = {}, secure = false, applicant = false, dateText = '' } = mf;
+  const { mode = 'view', m = {}, secure = false, applicant = false, dateText = '', dateEditable = false, dateValue = '', dateMax = '' } = mf;
   const edit = mode === 'edit';
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const dn = (n) => String(n).replace(/\d/g, (d) => '०१२३४५६७८९'[d]);
@@ -47,6 +50,16 @@
     return `<label class="${cls}" data-field="${name}"><span class="mf-l">${label}${req}</span>${input}<span class="field-error"></span></label>`;
   }
   const defaultValue = (k, fallback) => (m[k] ?? (applicant ? fallback : ''));
+  /* One named input plus a mirror, so the header and signature dates stay the same. */
+  function dateControl(named) {
+    if (!(edit && dateEditable)) {
+      const inline = named ? ' mf-inline' : '';
+      return `<span class="mf-v${inline}">${esc(dateText) || '&nbsp;'}</span>`;
+    }
+    const name = named ? ' name="form_date"' : '';
+    const max = dateMax ? ` max="${esc(dateMax)}"` : '';
+    return `<input class="mf-in mf-date" type="date" data-form-date${name}${max} value="${esc(dateValue)}" aria-label="दिनांक">`;
+  }
 %>
 <div class="mf-paper<%= edit ? ' mf-editing' : '' %>">
   <div class="mf-top">
@@ -64,7 +77,7 @@
   <div class="mf-headgrid">
     <ul class="mf-meta">
       <li><span class="mf-l">क्रमसंख्या :</span> <span class="mf-v mf-inline"><%= m.application_no || (applicant ? 'फ़ॉर्म जमा करने पर मिलेगी' : '') %></span></li>
-      <li><span class="mf-l">दिनांक :</span> <span class="mf-v mf-inline"><%= dateText %></span></li>
+      <li><span class="mf-l">दिनांक :</span> <%- dateControl(true) %></li>
     </ul>
     <% if (applicant) { %>
       <div class="mf-photo-wrap" data-field="photo">
@@ -187,7 +200,7 @@
         <span class="mf-v">&nbsp;</span>
       <% } %>
     </div>
-    <div class="mf-f w-sm"><span class="mf-l">दिनांक :</span><span class="mf-v"><%= dateText %></span></div>
+    <div class="mf-f w-sm"><span class="mf-l">दिनांक :</span><%- dateControl(false) %></div>
   </div>
 
   <div class="mf-office<%= applicant ? ' is-blank' : '' %>">

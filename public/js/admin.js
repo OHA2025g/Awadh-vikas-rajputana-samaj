@@ -72,6 +72,15 @@
   /* Auto-submit filters */
   $$('[data-autosubmit]').forEach((el) => el.addEventListener('change', () => el.form?.requestSubmit()));
 
+  /* Header and signature dates on the admin member form stay in step. */
+  const formDates = $$('[data-form-date]');
+  if (formDates.length > 1) {
+    const syncDates = (from) => formDates.forEach((el) => {
+      if (el !== from) el.value = from.value;
+    });
+    formDates.forEach((el) => el.addEventListener('input', () => syncDates(el)));
+  }
+
   /* Bulk selection */
   $$('[data-bulk]').forEach((form) => {
     const all = $('[data-select-all]', form);

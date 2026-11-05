@@ -67,6 +67,8 @@
           <th style="width:56px">क्रम</th>
           <th>दिनांक</th>
           <th>सदस्य</th>
+          <th>मंडल</th>
+          <th>मोबाइल</th>
           <% if (!filters.category) { %><th>श्रेणी</th><% } %>
           <% if (!fixedFee) { %><th style="text-align:right">राशि</th><% } %>
           <th>भुगतान प्रकार</th>
@@ -77,10 +79,10 @@
       </thead>
       <tbody>
         <% if (!rows.length) { %>
-          <tr><td colspan="<%= 8 + (filters.category ? 0 : 1) - (fixedFee ? 1 : 0) %>"><div class="empty-state"><%- icon('gift') %><p>इस फ़िल्टर में कोई प्रविष्टि नहीं मिली।</p>
+          <tr><td colspan="<%= 10 + (filters.category ? 0 : 1) - (fixedFee ? 1 : 0) %>"><div class="empty-state"><%- icon('gift') %><p>इस फ़िल्टर में कोई प्रविष्टि नहीं मिली।</p>
             <a class="btn btn-primary btn-sm" href="/admin/donations/new<%= filters.category ? '?category=' + filters.category : '' %>"><%- icon('plus') %> पहली प्रविष्टि जोड़ें</a></div></td></tr>
         <% } %>
-        <% rows.forEach((d, i) => { %>
+        <% rows.forEach((d, i) => { const phone = d.phone || d.member_phone; %>
           <tr>
             <td class="muted"><%= pg.offset + i + 1 %></td>
             <td class="nowrap"><%= formatDate(d.paid_on, 'short') %></td>
@@ -89,7 +91,10 @@
                 <% if (d.anonymous) { %><span class="badge gray" title="वेबसाइट पर नाम नहीं दिखेगा">गुप्त सहयोग</span><% } %>
               </div>
               <div class="cell-sub mono"><%= d.member_no || (d.member_id ? '' : 'सदस्य हटाया गया') %></div>
-              <% if (d.phone) { %><div class="cell-sub mono" title="केवल एडमिन पैनल में दिखता है"><%- icon('phone') %> <%= showPhone(d.phone) %></div><% } %>
+            </td>
+            <td><%= d.mandal_name || '—' %></td>
+            <td class="nowrap mono" title="केवल एडमिन पैनल में दिखता है">
+              <% if (phone && isSuper) { %><a href="tel:+<%= phone %>"><%= showPhone(phone) %></a><% } else if (phone) { %><%= showPhone(phone) %><% } else { %><span class="muted">—</span><% } %>
             </td>
             <% if (!filters.category) { %><td><span class="badge <%= catBadge[d.category] %>"><%= DONATION_CATEGORY_LABEL[d.category] %></span></td><% } %>
             <% if (!fixedFee) { %><td class="nowrap" style="text-align:right"><b class="don-total"><%= formatINR(d.amount_paise) %></b></td><% } %>
