@@ -135,6 +135,65 @@ function pickPhone(i) {
   return `9198${String(10000000 + i * 7919).slice(-8)}`;
 }
 
+function placeholders(n) {
+  return Array.from({ length: n }, () => '?').join(',');
+}
+
+async function deleteIn(sql, values) {
+  if (!values.length) return 0;
+  return (await db.prepare(`${sql} (${placeholders(values.length)})`).run(...values)).changes || 0;
+}
+
+/** Remove the sample members / posts / events that shipped with the first deploy. Real rows you added are kept. */
+async function removeDemoContent() {
+  if (process.env.SEED_DEMO === 'true') return;
+  if (await getSetting('demo_removed')) return;
+
+  const phones = [...MEMBERS.map((_, i) => pickPhone(i + 1)), pickPhone(100), pickPhone(101)];
+  const memberNames = [...MEMBERS.map((m) => m[3]), ...PENDING.map((p) => p[1])];
+  const fatherNames = [...MEMBERS.map((m) => m[4]), ...PENDING.map((p) => p[2])];
+  const personNames = PEOPLE.map((p) => p[1]);
+  const programTitles = PROGRAMS.map((p) => p[0]);
+  const eventTitles = EVENTS.map((e) => e[0]);
+  const postTitles = POSTS.map((p) => p[1]);
+
+  await tx(async () => {
+    const members = await db.prepare('SELECT id, name, father_name, phone FROM members').all();
+    const demoIds = members
+      .filter(
+        (m) =>
+          phones.includes(m.phone) || (memberNames.includes(m.name) && fatherNames.includes(m.father_name))
+      )
+      .map((m) => m.id);
+
+    if (demoIds.length) {
+      await deleteIn('DELETE FROM donations WHERE member_id IN', demoIds);
+      await deleteIn('DELETE FROM certificate_log WHERE member_id IN', demoIds);
+      await deleteIn('DELETE FROM broadcast_recipients WHERE member_id IN', demoIds);
+      await deleteIn("UPDATE posts SET member_id = NULL WHERE member_id IN", demoIds);
+      await deleteIn('DELETE FROM members WHERE id IN', demoIds);
+    }
+    await deleteIn('DELETE FROM donations WHERE donor_name IN', memberNames);
+
+    const posts = await db.prepare('SELECT id, title FROM posts').all();
+    const postIds = posts.filter((p) => postTitles.includes(p.title)).map((p) => p.id);
+    if (postIds.length) {
+      await deleteIn('DELETE FROM comments WHERE post_id IN', postIds);
+      await deleteIn('DELETE FROM post_likes WHERE post_id IN', postIds);
+      await deleteIn('DELETE FROM posts WHERE id IN', postIds);
+    }
+
+    await deleteIn('DELETE FROM people WHERE name IN', personNames);
+    await deleteIn('DELETE FROM programs WHERE title IN', programTitles);
+    await deleteIn('DELETE FROM events WHERE title IN', eventTitles);
+
+    const remaining = (await db.prepare('SELECT COUNT(*) AS n FROM members WHERE member_no IS NOT NULL').get()).n;
+    await setSetting('member_counter', remaining);
+    await setSetting('demo_removed', true);
+  });
+  console.log('[seed] नमूना सदस्य, दान, कार्यक्रम और पोस्ट हटाए गए।');
+}
+
 export async function seedIfEmpty() {
   const hasAdmin = (await db.prepare('SELECT COUNT(*) AS n FROM admins').get()).n > 0;
   if (!hasAdmin) {
@@ -146,7 +205,11 @@ export async function seedIfEmpty() {
     console.log(`[seed] एडमिन बनाया गया: ${username} (पहले लॉगिन पर पासवर्ड बदलना आवश्यक है)`);
   }
 
+  await removeDemoContent();
+
   if (await getSetting('seeded')) return;
+
+  const seedDemo = process.env.SEED_DEMO === 'true';
 
   await tx(async () => {
     const insSection = db.prepare(`INSERT INTO sections
@@ -155,6 +218,18 @@ export async function seedIfEmpty() {
       ON CONFLICT (slug) DO NOTHING`);
     for (const [i, s] of SECTIONS.entries()) {
       await insSection.run({ body: null, body2: null, image: null, layout: 'image-right', ...s, sort_order: (i + 1) * 10 });
+    }
+
+    const insMandal = db.prepare('INSERT INTO mandals (name, name_en, description, sort_order) VALUES (?, ?, ?, ?)');
+    const mandalIds = [];
+    for (const [i, [n, en, d]] of MANDALS.entries()) mandalIds.push((await insMandal.run(n, en, d, i)).lastInsertRowid);
+    const insCommittee = db.prepare('INSERT INTO committees (name, name_en, sort_order) VALUES (?, ?, ?)');
+    const committeeIds = [];
+    for (const [i, [n, en]] of COMMITTEES.entries()) committeeIds.push((await insCommittee.run(n, en, i)).lastInsertRowid);
+
+    if (!seedDemo) {
+      await setSetting('seeded', true);
+      return;
     }
 
     const insPerson = db.prepare(
@@ -171,13 +246,6 @@ export async function seedIfEmpty() {
       'INSERT INTO events (title, event_date, event_time, location, image, summary, body) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
     for (const [t, d, time, loc, img, sum] of EVENTS) await insEvent.run(t, d, time, loc, img, sum, `<p>${sum}</p>`);
-
-    const insMandal = db.prepare('INSERT INTO mandals (name, name_en, description, sort_order) VALUES (?, ?, ?, ?)');
-    const mandalIds = [];
-    for (const [i, [n, en, d]] of MANDALS.entries()) mandalIds.push((await insMandal.run(n, en, d, i)).lastInsertRowid);
-    const insCommittee = db.prepare('INSERT INTO committees (name, name_en, sort_order) VALUES (?, ?, ?)');
-    const committeeIds = [];
-    for (const [i, [n, en]] of COMMITTEES.entries()) committeeIds.push((await insCommittee.run(n, en, i)).lastInsertRowid);
 
     const insMember = db.prepare(`INSERT INTO members
       (status, category, designation, salutation, name, father_name, gender, phone, whatsapp, city, district, state,
@@ -251,5 +319,5 @@ export async function seedIfEmpty() {
 
     await setSetting('seeded', true);
   });
-  console.log('[seed] नमूना सामग्री जोड़ी गई।');
+  console.log(seedDemo ? '[seed] नमूना सामग्री जोड़ी गई।' : '[seed] खाली साइट तैयार है (नमूना सदस्य/दान नहीं जोड़े गए)।');
 }

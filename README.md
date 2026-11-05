@@ -17,7 +17,7 @@ Open http://localhost:3000 for the website and http://localhost:3000/admin for t
 
 Default login: `admin` / `admin123` — you are asked to change the password on first login. To set your own initial credentials, copy `.env.example` to `.env` and set `ADMIN_USERNAME` / `ADMIN_PASSWORD` **before the first start**.
 
-All sample text, people, events, and members are placeholders; edit or delete them from the admin panel.
+Production (EasyPanel) starts **without** sample members, donations, events or posts. Add real data from the admin panel. For a local preview with placeholders, set `SEED_DEMO=true` **before the first start**.
 
 ## Data and backups
 
