@@ -98,6 +98,7 @@ function toPublicDonation(d) {
     date: formatDate(d.paid_on, 'short'),
     details: d.details || '',
     reference: maskReference(d.reference),
+    mandal: d.anonymous ? '' : d.mandal_name || '',
   };
 }
 

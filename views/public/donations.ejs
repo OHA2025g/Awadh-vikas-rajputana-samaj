@@ -59,6 +59,7 @@
               <tr>
                 <th>क्रम संख्या</th>
                 <th>सदस्य का नाम</th>
+                <th>मंडल</th>
                 <% if (!fixedFee) { %><th class="num">राशि (₹)</th><% } %>
                 <th>भुगतान प्रकार</th>
                 <th>दिनांक</th>
@@ -70,6 +71,7 @@
                 <tr>
                   <td data-label="क्रम संख्या"><%= pg.offset + i + 1 %></td>
                   <td data-label="सदस्य का नाम" class="<%= d.anonymous ? 'don-anon' : 'don-name' %>"><%= d.name %></td>
+                  <td data-label="मंडल"><%= d.mandal || '—' %></td>
                   <% if (!fixedFee) { %><td data-label="राशि (₹)" class="num don-amount"><%= d.amount %></td><% } %>
                   <td data-label="भुगतान प्रकार"><span class="pay-chip"><%= d.mode %></span></td>
                   <td data-label="दिनांक" class="nowrap"><%= d.date %></td>
