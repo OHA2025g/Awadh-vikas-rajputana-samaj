@@ -62,13 +62,13 @@ export const DEFAULT_CALIBRATION = {
     fontSize: 20,
     font: 'Tiro Devanagari Hindi',
     weight: 700,
-    color: '#1b2a6b',
+    color: '#e65c00',
     align: 'center',
     salutation: false,
   },
-  signature: { x: 213, y: 178, width: 40, height: 16 },
-  date: { enabled: true, x: 128.5, y: 184, fontSize: 14, hindiDigits: false },
-  serial: { enabled: false, x: 244.5, y: 71.7, fontSize: 13, prefix: '' },
+  signature: { x: 213, y: 178, width: 40, height: 16, color: '#1c3faa' },
+  date: { enabled: true, x: 128.5, y: 184, fontSize: 14, hindiDigits: false, color: '#000000' },
+  serial: { enabled: false, x: 244.5, y: 71.7, fontSize: 13, prefix: '', color: '#000000' },
   design: {
     reg_line: 'रजि. नंबर : पुणे/०००४२८/२०२५',
     trust_line: 'Number in the Register of Public Trusts F-0066456(PUN)',
@@ -145,10 +145,17 @@ function mergeDefaults(defaults, saved) {
  */
 export async function getCalibration() {
   const saved = await getSetting('print_calibration', {});
-  if (saved?.version === CALIBRATION_VERSION) return mergeDefaults(DEFAULT_CALIBRATION, saved);
+  if (saved?.version === CALIBRATION_VERSION) return withCurrentNameColor(mergeDefaults(DEFAULT_CALIBRATION, saved));
   const legacy = {};
   for (const k of ['offsetX', 'offsetY']) if (Number.isFinite(saved?.[k])) legacy[k] = saved[k];
   return mergeDefaults(DEFAULT_CALIBRATION, legacy);
+}
+
+/** Calibrations saved with the former navy default follow the current name colour. */
+const FORMER_NAME_COLOR = '#1b2a6b';
+function withCurrentNameColor(cal) {
+  if (String(cal.name.color).toLowerCase() === FORMER_NAME_COLOR) cal.name.color = DEFAULT_CALIBRATION.name.color;
+  return cal;
 }
 
 export async function saveCalibration(input) {

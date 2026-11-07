@@ -89,11 +89,11 @@
     try {
       await img.decode();
     } catch {
-      return url;
+      return null;
     }
     const w = img.naturalWidth;
     const h = img.naturalHeight;
-    if (!w || !h || w * h > 16e6) return url;
+    if (!w || !h || w * h > 16e6) return null;
     const canvas = el('canvas');
     canvas.width = w;
     canvas.height = h;
@@ -144,20 +144,40 @@
         }
       }
     }
-    if (maxX < 0) return url;
+    if (maxX < 0) return null;
     const out = el('canvas');
     out.width = maxX - minX + 1;
     out.height = maxY - minY + 1;
     out.getContext('2d').drawImage(canvas, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
-    return out.toDataURL('image/png');
+    return out;
   }
+
+  /** Repaints every stroke in one ink colour, keeping the stroke shape and soft edges. */
+  function tintSignature(trimmed, color) {
+    const c = el('canvas');
+    c.width = trimmed.width;
+    c.height = trimmed.height;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(trimmed, 0, 0);
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, c.width, c.height);
+    return c.toDataURL('image/png');
+  }
+
+  const trimmedSignatures = new Map();
+  const sigKey = (id) => `${id}|${cal.signature.color}`;
 
   function loadSignature(id) {
     if (!id) return Promise.resolve('');
-    if (!signatureUrls.has(id)) {
-      signatureUrls.set(id, trimSignature(`/admin/certificates/signature/${encodeURIComponent(id)}`));
+    const key = sigKey(id);
+    if (!signatureUrls.has(key)) {
+      const src = `/admin/certificates/signature/${encodeURIComponent(id)}`;
+      if (!trimmedSignatures.has(id)) trimmedSignatures.set(id, trimSignature(src));
+      const color = cal.signature.color;
+      signatureUrls.set(key, trimmedSignatures.get(id).then((t) => (t ? tintSignature(t, color) : src)));
     }
-    return signatureUrls.get(id);
+    return signatureUrls.get(key);
   }
 
   /* ---------- Built-in design (a replica of the pre-printed sheet) ---------- */
@@ -227,10 +247,10 @@
 
   /* ---------- Sheet construction ---------- */
 
-  function inkText(node, sizePt) {
+  function inkText(node, sizePt, color) {
     node.style.fontFamily = `"${cal.name.font}", "Tiro Devanagari Hindi", serif`;
     node.style.fontWeight = cal.name.weight;
-    node.style.color = cal.name.color;
+    node.style.color = color;
     node.style.fontSize = `${sizePt}pt`;
   }
 
@@ -241,7 +261,7 @@
     const t = el('span', 'ink', text);
     t.append(el('i', 'bl'));
     f.append(t);
-    inkText(f, sizePt);
+    inkText(f, sizePt, cal[key].color);
     return f;
   }
 
@@ -267,7 +287,7 @@
     sheet.append(n);
 
     let sig;
-    const sigUrl = ui.signatureId && signatureUrls.get(ui.signatureId);
+    const sigUrl = ui.signatureId && signatureUrls.get(sigKey(ui.signatureId));
     if (typeof sigUrl === 'string' && sigUrl) {
       sig = el('img', 'f f-sig');
       sig.src = sigUrl;
@@ -430,6 +450,7 @@
       ? `${icon('info')} <b>प्री-प्रिंटेड पेपर मोड:</b> केवल सदस्य का नाम, अध्यक्ष / सचिव के हस्ताक्षर${extras.length ? ` तथा ${extras.join(' व ')}` : ''} छपेंगे — शीट का डिज़ाइन नहीं छपेगा।`
       : `${icon('alert')} <b>पूर्ण डिज़ाइन मोड:</b> सादे कागज़ पर पूरा प्रमाण पत्र (बॉर्डर, लोगो व पाठ सहित) छपेगा। प्रिंट सेटिंग में "Background graphics" चालू करें।`;
     $('#date-opt').hidden = !cal.date.enabled;
+    if (ui.signatureId && typeof signatureUrls.get(sigKey(ui.signatureId)) !== 'string') useSignature(ui.signatureId);
   }
 
   new ResizeObserver(layoutPreview).observe(previewWrap);
@@ -620,9 +641,10 @@
 
   async function useSignature(id) {
     if (!id) return;
+    const key = sigKey(id);
     const url = await loadSignature(id);
-    signatureUrls.set(id, url);
-    if (ui.signatureId === id) renderPreview();
+    signatureUrls.set(key, url);
+    if (ui.signatureId === id && sigKey(id) === key) renderPreview();
   }
 
   /* ---------- Member picker ---------- */

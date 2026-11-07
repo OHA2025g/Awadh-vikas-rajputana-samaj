@@ -150,7 +150,7 @@
               </select>
             </div>
             <div class="field">
-              <label for="c-color">स्याही रंग</label>
+              <label for="c-color">नाम का रंग</label>
               <input type="color" id="c-color" data-path="name.color">
             </div>
           </div>
@@ -165,6 +165,10 @@
             <%- rng('signature.y', 'Y — निचला किनारा (रेखा), ऊपर से', 0, 210, 0.1, 'mm') %>
             <%- rng('signature.width', 'चौड़ाई', 10, 120, 0.5, 'mm') %>
             <%- rng('signature.height', 'ऊँचाई', 5, 60, 0.5, 'mm') %>
+          </div>
+          <div class="field ctl-extras" style="max-width:220px">
+            <label for="c-sig-color">स्याही रंग <small class="muted">(हस्ताक्षर इसी रंग में छपेंगे)</small></label>
+            <input type="color" id="c-sig-color" data-path="signature.color">
           </div>
           <p class="hint"><a href="/admin/signatures"><%- icon('pen-tool') %> हस्ताक्षर जोड़ें / बदलें</a></p>
         </div>
@@ -194,6 +198,10 @@
                 <%- rng('date.y', 'Y — आधार-रेखा, ऊपर से', 0, 210, 0.1, 'mm') %>
                 <%- rng('date.fontSize', 'फ़ॉन्ट', 8, 36, 0.5, 'pt') %>
               </div>
+              <div class="field ctl-extras" style="max-width:220px">
+                <label for="c-date-color">दिनांक का रंग</label>
+                <input type="color" id="c-date-color" data-path="date.color">
+              </div>
               <label class="check"><input type="checkbox" data-path="date.hindiDigits"> अंक देवनागरी में छापें (०२/११/२०२६)</label>
             </div>
             <div>
@@ -208,6 +216,10 @@
                 <div class="field">
                   <label for="c-prefix">उपसर्ग</label>
                   <input type="text" id="c-prefix" data-path="serial.prefix" maxlength="12" placeholder="जैसे: ARVS/">
+                </div>
+                <div class="field">
+                  <label for="c-serial-color">क्रम संख्या का रंग</label>
+                  <input type="color" id="c-serial-color" data-path="serial.color">
                 </div>
                 <div class="field">
                   <label for="next-serial">अगला क्रमांक</label>
