@@ -90,7 +90,7 @@ router.get('/', async (req, res) => {
     broadcasts,
     upcoming,
     certsIssued,
-    gateway: gatewayStatus(),
+    gateway: await gatewayStatus(),
   });
 });
 

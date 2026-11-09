@@ -415,7 +415,20 @@ async function initSchema() {
     family: "TEXT NOT NULL DEFAULT '[]'",
     relatives: "TEXT NOT NULL DEFAULT '[]'",
   });
-  await ensureColumns('donations', { phone: 'TEXT' });
+  await ensureColumns('donations', {
+    phone: 'TEXT',
+    receipt_no: 'INTEGER',
+    wa_status: 'TEXT',
+    wa_error: 'TEXT',
+    wa_sent_at: 'TEXT',
+  });
+  await pool.query(
+    `UPDATE donations d SET receipt_no = n.rn
+     FROM (SELECT id, (SELECT COALESCE(MAX(receipt_no), 0) FROM donations) + ROW_NUMBER() OVER (ORDER BY id) AS rn
+           FROM donations WHERE receipt_no IS NULL) n
+     WHERE d.id = n.id`
+  );
+  await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_donations_receipt ON donations(receipt_no)');
 }
 
 await initSchema();

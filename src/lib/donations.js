@@ -7,7 +7,8 @@ const DONOR_NAME = `COALESCE(TRIM(COALESCE(m.salutation, '') || ' ' || m.name), 
 
 const BASE_SELECT = `
   SELECT d.*, ${DONOR_NAME} AS name, m.member_no, m.status AS member_status,
-         m.phone AS member_phone, md.name AS mandal_name,
+         m.phone AS member_phone, m.whatsapp AS member_whatsapp, m.address AS member_address, m.city AS member_city,
+         md.name AS mandal_name,
          a.name AS admin_name, a.username AS admin_username
   FROM donations d
   LEFT JOIN members m ON m.id = d.member_id
@@ -48,7 +49,7 @@ function buildWhere({ category, mode, from, to, q } = {}, { isPublic = false } =
     where.push(
       isPublic
         ? `(d.anonymous = 0 AND ${DONOR_NAME} ILIKE @q ESCAPE E'\\\\')`
-        : `(${DONOR_NAME} ILIKE @q ESCAPE E'\\\\' OR m.member_no ILIKE @q ESCAPE E'\\\\' OR d.reference ILIKE @q ESCAPE E'\\\\' OR d.details ILIKE @q ESCAPE E'\\\\' OR d.phone ILIKE @q ESCAPE E'\\\\')`
+        : `(${DONOR_NAME} ILIKE @q ESCAPE E'\\\\' OR m.member_no ILIKE @q ESCAPE E'\\\\' OR d.reference ILIKE @q ESCAPE E'\\\\' OR d.details ILIKE @q ESCAPE E'\\\\' OR d.phone ILIKE @q ESCAPE E'\\\\' OR CAST(d.receipt_no AS TEXT) ILIKE @q ESCAPE E'\\\\')`
     );
     params.q = likeTerm(q);
   }

@@ -36,7 +36,7 @@
   <div class="card-head">
     <form class="toolbar" method="get" action="/admin/donations">
       <% if (filters.category) { %><input type="hidden" name="category" value="<%= filters.category %>"><% } %>
-      <input type="search" name="q" value="<%= filters.q %>" placeholder="नाम, सदस्य क्रमांक, संदर्भ…">
+      <input type="search" name="q" value="<%= filters.q %>" placeholder="नाम, सदस्य क्रमांक, रसीद क्र., संदर्भ…">
       <select name="mode" data-autosubmit aria-label="भुगतान प्रकार">
         <option value="">सभी भुगतान प्रकार</option>
         <% PAYMENT_MODES.forEach((m) => { %><option value="<%= m.key %>" <%= filters.mode === m.key ? 'selected' : '' %>><%= m.label %></option><% }) %>
@@ -54,6 +54,9 @@
       <span class="muted small"> — <% if (fixedFee) { %>निर्धारित शुल्क <b><%= formatINR(LIFETIME_FEE_PAISE) %></b> प्रति सदस्य • <% } %>कुल <b><%= entryCount(current.n) %></b> • कुल राशि <b class="don-total"><%= formatINR(current.sum) %></b></span>
     </span>
     <div class="actions">
+      <form id="receipt-form" method="get" action="/admin/donations/receipts" target="_blank" class="inline-form">
+        <button class="btn btn-maroon btn-sm" type="submit" data-receipt-print disabled><%- icon('printer') %> चुनी रसीदें प्रिंट करें (<span data-receipt-count>0</span>)</button>
+      </form>
       <a class="btn btn-outline btn-sm" href="/admin/donations/export.csv<%= qs ? '?' + qs : '' %>"><%- icon('download') %> CSV</a>
       <a class="btn btn-outline btn-sm" href="/admin/donations/export.xlsx<%= qs ? '?' + qs : '' %>"><%- icon('download') %> Excel</a>
       <a class="btn btn-primary btn-sm" href="/admin/donations/new<%= filters.category ? '?category=' + filters.category : '' %>"><%- icon('plus') %> नई प्रविष्टि</a>
@@ -64,7 +67,8 @@
     <table class="table">
       <thead>
         <tr>
-          <th style="width:56px">क्रम</th>
+          <th style="width:36px"><input type="checkbox" data-receipt-all aria-label="इस पृष्ठ की सभी प्रविष्टियाँ चुनें"></th>
+          <th style="width:64px">रसीद क्र.</th>
           <th>दिनांक</th>
           <th>सदस्य</th>
           <th>मंडल</th>
@@ -79,12 +83,13 @@
       </thead>
       <tbody>
         <% if (!rows.length) { %>
-          <tr><td colspan="<%= 10 + (filters.category ? 0 : 1) - (fixedFee ? 1 : 0) %>"><div class="empty-state"><%- icon('gift') %><p>इस फ़िल्टर में कोई प्रविष्टि नहीं मिली।</p>
+          <tr><td colspan="<%= 11 + (filters.category ? 0 : 1) - (fixedFee ? 1 : 0) %>"><div class="empty-state"><%- icon('gift') %><p>इस फ़िल्टर में कोई प्रविष्टि नहीं मिली।</p>
             <a class="btn btn-primary btn-sm" href="/admin/donations/new<%= filters.category ? '?category=' + filters.category : '' %>"><%- icon('plus') %> पहली प्रविष्टि जोड़ें</a></div></td></tr>
         <% } %>
         <% rows.forEach((d, i) => { const phone = d.phone || d.member_phone; %>
           <tr>
-            <td class="muted"><%= pg.offset + i + 1 %></td>
+            <td><input type="checkbox" name="ids" value="<%= d.id %>" form="receipt-form" aria-label="रसीद <%= d.receipt_no %> चुनें"></td>
+            <td class="mono"><b><%= d.receipt_no %></b></td>
             <td class="nowrap"><%= formatDate(d.paid_on, 'short') %></td>
             <td>
               <div class="cell-main"><%= d.name %>
@@ -107,9 +112,20 @@
             <td>
               <div class="small"><%= d.admin_name || d.admin_username || '—' %></div>
               <div class="cell-sub"><%= d.updated_at ? 'संपादित ' + formatDate(d.updated_at, 'short') : formatDate(d.created_at, 'short') %></div>
+              <% if (d.wa_status === 'sent') { %>
+                <div class="cell-sub wa-ok" title="<%= formatDate(d.wa_sent_at, 'datetime') %>"><%- icon('whatsapp') %> संदेश भेजा</div>
+              <% } else if (d.wa_status) { %>
+                <div class="cell-sub wa-fail" title="<%= d.wa_error || '' %>"><%- icon('alert') %> <%= d.wa_status === 'no_phone' ? 'मोबाइल नंबर नहीं' : 'संदेश नहीं गया' %></div>
+              <% } %>
             </td>
             <td>
               <div class="actions">
+                <a class="btn btn-outline btn-sm btn-icon" href="/admin/donations/receipts?ids=<%= d.id %>" target="_blank" rel="noopener" title="रसीद प्रिंट करें"><%- icon('printer') %></a>
+                <form method="post" action="/admin/donations/<%= d.id %>/whatsapp" class="inline-form" data-confirm="<%= d.name %> को व्हाट्सऐप पर धन्यवाद व पुष्टि संदेश <%= d.wa_status === 'sent' ? 'दोबारा ' : '' %>भेजें?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="back" value="<%= pageUrl(pg.page) %>">
+                  <button class="btn btn-outline btn-sm btn-icon" type="submit" title="<%= d.wa_status === 'sent' ? 'व्हाट्सऐप संदेश पुनः भेजें' : 'व्हाट्सऐप पर धन्यवाद संदेश भेजें' %>"><%- icon('whatsapp') %></button>
+                </form>
                 <a class="btn btn-outline btn-sm btn-icon" href="/admin/donations/<%= d.id %>/edit" title="संपादित करें"><%- icon('edit') %></a>
                 <% if (isSuper) { %>
                   <form method="post" action="/admin/donations/<%= d.id %>/delete" class="inline-form" data-confirm="<%= d.name %> की <%= formatINR(d.amount_paise) %> की प्रविष्टि स्थायी रूप से हटाएँ?">
@@ -136,6 +152,6 @@
   <% } %>
 </div>
 
-<p class="muted small" style="margin-top:12px"><%- icon('info') %> सार्वजनिक "सहयोग" पृष्ठ पर नाम, राशि, भुगतान प्रकार, दिनांक, विवरण तथा संदर्भ संख्या के केवल अंतिम 4 अंक दिखते हैं। गुप्त सहयोग में नाम नहीं दिखता। सहयोगकर्ता का मोबाइल नंबर केवल एडमिन पैनल में दिखता है, वेबसाइट पर नहीं।<% if (!isSuper) { %> प्रविष्टि हटाने का अधिकार केवल मुख्य एडमिन को है।<% } %></p>
+<p class="muted small" style="margin-top:12px"><%- icon('info') %> सार्वजनिक "सहयोग" पृष्ठ पर नाम, राशि, भुगतान प्रकार, दिनांक, विवरण तथा संदर्भ संख्या के केवल अंतिम 4 अंक दिखते हैं। गुप्त सहयोग में नाम नहीं दिखता। सहयोगकर्ता का मोबाइल नंबर केवल एडमिन पैनल में दिखता है, वेबसाइट पर नहीं। रसीद प्रिंट करने के लिए प्रविष्टियाँ चुनें और "चुनी रसीदें प्रिंट करें" दबाएँ, या किसी पंक्ति में <%- icon('printer') %> दबाएँ; <%- icon('whatsapp') %> से धन्यवाद संदेश दोबारा भेज सकते हैं।<% if (!isSuper) { %> प्रविष्टि हटाने का अधिकार केवल मुख्य एडमिन को है।<% } %></p>
 
 <%- include('../partials/admin-bottom') %>

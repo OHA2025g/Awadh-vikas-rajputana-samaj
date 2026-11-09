@@ -41,8 +41,8 @@ export function hasSavedSession() {
   return fs.existsSync(path.join(WA_AUTH_DIR, 'creds.json'));
 }
 
-export function gatewayStatus() {
-  const cfg = getWhatsAppConfig();
+export async function gatewayStatus() {
+  const cfg = await getWhatsAppConfig();
   switch (cfg.provider) {
     case 'cloud': {
       const ready = Boolean(cfg.cloud_phone_id && cfg.cloud_token);
@@ -60,8 +60,8 @@ export function gatewayStatus() {
   }
 }
 
-export function isGatewayReady() {
-  return gatewayStatus().status === 'connected';
+export async function isGatewayReady() {
+  return (await gatewayStatus()).status === 'connected';
 }
 
 export async function connectBaileys() {
@@ -179,14 +179,14 @@ export async function disconnectBaileys({ logout = false } = {}) {
 }
 
 export async function autoStartWhatsApp() {
-  if (getWhatsAppConfig().provider === 'baileys' && hasSavedSession()) {
+  if ((await getWhatsAppConfig()).provider === 'baileys' && hasSavedSession()) {
     await connectBaileys();
   }
 }
 
 /** phone: 12-digit number with country code, e.g. 919876543210 */
 export async function sendWhatsApp(phone, text) {
-  const cfg = getWhatsAppConfig();
+  const cfg = await getWhatsAppConfig();
   switch (cfg.provider) {
     case 'baileys':
       return sendViaBaileys(phone, text);

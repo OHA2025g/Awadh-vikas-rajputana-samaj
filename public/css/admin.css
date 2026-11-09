@@ -655,6 +655,21 @@ table.table {
   color: var(--muted);
 }
 
+.cell-sub.wa-ok {
+  color: var(--green);
+}
+
+.cell-sub.wa-fail {
+  color: var(--red);
+}
+
+.cell-sub.wa-ok .ic,
+.cell-sub.wa-fail .ic {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+}
+
 .who-cell {
   display: flex;
   gap: 10px;

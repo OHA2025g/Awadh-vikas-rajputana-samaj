@@ -1,5 +1,6 @@
 import express from 'express';
 import ExcelJS from 'exceljs';
+import QRCode from 'qrcode';
 import { db } from '../../db.js';
 import {
   DONATION_CATEGORY_KEYS,
@@ -10,7 +11,9 @@ import {
 } from '../../config.js';
 import { flash, requireSuper } from '../../middleware/auth.js';
 import { donationFilters, listDonations, allDonations, getDonation, donationTotals } from '../../lib/donations.js';
+import { RECEIPT_REASONS, donationPhone, nextReceiptNo, sendDonationThanks } from '../../lib/donation-receipt.js';
 import { likeTerm } from '../../lib/members.js';
+import { getSite } from '../../lib/settings.js';
 import {
   str,
   int,
@@ -25,6 +28,7 @@ import {
   normalizePhone,
   formatPhone,
   maskPhone,
+  amountInWordsHi,
 } from '../../lib/util.js';
 
 const router = express.Router();
@@ -88,6 +92,7 @@ async function blankDonation(query) {
     reference: '',
     details: '',
     anonymous: 0,
+    send_whatsapp: true,
     ...(member?.status === 'approved' ? { member_id: member.id, name: memberLabel(member), member_no: member.member_no } : {}),
   };
 }
@@ -155,15 +160,94 @@ async function parseDonation(body, existing = null) {
 
 router.get('/donations/new', async (req, res) => renderForm(res, await blankDonation(req.query)));
 
+const insertDonation = db.prepare(
+  `INSERT INTO donations (member_id, donor_name, category, amount_paise, phone, payment_mode, reference, details, paid_on, anonymous, admin_id, receipt_no)
+   VALUES (@member_id, @donor_name, @category, @amount_paise, @phone, @payment_mode, @reference, @details, @paid_on, @anonymous, @admin_id, @receipt_no)`
+);
+
+/** Two admins saving at the same moment can race for a रसीद क्रमांक; the unique index makes one retry. */
+async function insertWithReceiptNo(row) {
+  for (let attempt = 1; ; attempt++) {
+    const receiptNo = await nextReceiptNo();
+    try {
+      const info = await insertDonation.run({ ...row, receipt_no: receiptNo });
+      return { id: Number(info.lastInsertRowid), receiptNo };
+    } catch (err) {
+      if (err?.code !== '23505' || attempt >= 3) throw err;
+    }
+  }
+}
+
+const whatsappNote = (result) =>
+  result.ok ? ' धन्यवाद संदेश व्हाट्सऐप पर भेजा गया।' : ` व्हाट्सऐप संदेश नहीं भेजा जा सका: ${result.error}`;
+
 router.post('/donations', async (req, res) => {
   const { v, errors, formValues } = await parseDonation(req.body ?? {});
-  if (errors.length) return renderForm(res, formValues, errors);
-  await db.prepare(
-    `INSERT INTO donations (member_id, donor_name, category, amount_paise, phone, payment_mode, reference, details, paid_on, anonymous, admin_id)
-     VALUES (@member_id, @donor_name, @category, @amount_paise, @phone, @payment_mode, @reference, @details, @paid_on, @anonymous, @admin_id)`
-  ).run({ ...v, admin_id: req.admin.id });
-  flash(req, 'success', `${v.donor_name} की ${formatINR(v.amount_paise)} की प्रविष्टि (${DONATION_CATEGORY_LABEL[v.category]}) सहेजी गई।`);
+  if (errors.length) return renderForm(res, { ...formValues, send_whatsapp: bool(req.body?.send_whatsapp) }, errors);
+  const { id, receiptNo } = await insertWithReceiptNo({ ...v, admin_id: req.admin.id });
+  let msg = `${v.donor_name} की ${formatINR(v.amount_paise)} की प्रविष्टि (${DONATION_CATEGORY_LABEL[v.category]}) सहेजी गई — रसीद क्रमांक ${receiptNo}।`;
+  let type = 'success';
+  if (bool(req.body?.send_whatsapp)) {
+    const result = await sendDonationThanks(id);
+    msg += whatsappNote(result);
+    if (!result.ok) {
+      msg += ' — सूची में व्हाट्सऐप बटन से दोबारा भेज सकते हैं।';
+      type = 'warn';
+    }
+  }
+  flash(req, type, msg);
   res.redirect(req.body?.again ? `/admin/donations/new?category=${v.category}` : `/admin/donations?category=${v.category}`);
+});
+
+router.post('/donations/:id/whatsapp', async (req, res, next) => {
+  const d = await getDonation(req.params.id);
+  if (!d) return next();
+  const result = await sendDonationThanks(d.id);
+  flash(req, result.ok ? 'success' : 'error', `रसीद ${d.receipt_no} (${d.name}):${whatsappNote(result)}`);
+  res.redirect(String(req.body?.back || '').startsWith('/admin/donations') ? req.body.back : '/admin/donations');
+});
+
+/* ---------- Printable रसीद ---------- */
+
+function receiptIds(value) {
+  return [...new Set([].concat(value || []).flatMap((v) => String(v).split(',')).map(Number))]
+    .filter((n) => Number.isInteger(n) && n > 0)
+    .slice(0, 200);
+}
+
+async function receiptQr(site) {
+  if (site.receipt_qr) return site.receipt_qr;
+  if (!site.upi_id) return '';
+  const params = new URLSearchParams({ pa: site.upi_id, pn: site.org_name_en || site.org_name, cu: 'INR' });
+  return QRCode.toDataURL(`upi://pay?${params}`, { margin: 0, width: 240 });
+}
+
+router.get('/donations/receipts', async (req, res) => {
+  const ids = receiptIds(req.query.ids);
+  const rows = [];
+  for (const id of ids) {
+    const d = await getDonation(id);
+    if (d) rows.push(d);
+  }
+  if (!rows.length) {
+    flash(req, 'error', 'रसीद प्रिंट करने के लिए कम से कम एक प्रविष्टि चुनें।');
+    return res.redirect('/admin/donations');
+  }
+  const site = await getSite();
+  const showPhone = req.admin.role === 'superadmin' ? formatPhone : maskPhone;
+  const receipts = rows.map((d) => {
+    const phone = donationPhone(d);
+    return {
+      ...d,
+      date_out: formatDate(d.paid_on, 'numeric'),
+      phone_out: phone ? showPhone(phone) : '',
+      residence: d.member_address || d.member_city || '',
+      amount_out: formatINR(d.amount_paise),
+      words_out: amountInWordsHi(d.amount_paise),
+      mode_out: [PAYMENT_MODE_LABEL[d.payment_mode] || d.payment_mode, d.reference].filter(Boolean).join(' — '),
+    };
+  });
+  res.render('admin/receipt-print', { site, receipts, reasons: RECEIPT_REASONS, qr: await receiptQr(site) });
 });
 
 router.get('/donations/:id/edit', async (req, res, next) => {
@@ -200,6 +284,7 @@ router.post('/donations/:id/delete', requireSuper, async (req, res) => {
 
 const EXPORT_COLUMNS = [
   ['sr', 'क्रम संख्या', 8],
+  ['receipt_no', 'रसीद क्रमांक', 12],
   ['paid_on_out', 'दिनांक', 14],
   ['member_no', 'सदस्य क्रमांक', 14],
   ['name', 'सदस्य का नाम', 28],

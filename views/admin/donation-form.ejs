@@ -94,6 +94,13 @@
     <div class="field span-all">
       <label class="check"><input type="checkbox" name="anonymous" value="1" <%= Number(d.anonymous) ? 'checked' : '' %>> गुप्त सहयोग — वेबसाइट पर सदस्य का नाम न दिखाएँ</label>
     </div>
+
+    <% if (isNew) { %>
+    <div class="field span-all">
+      <label class="check"><input type="checkbox" name="send_whatsapp" value="1" <%= d.send_whatsapp ? 'checked' : '' %>> <%- icon('whatsapp') %> सहेजते ही व्हाट्सऐप पर धन्यवाद व पुष्टि संदेश (रसीद क्रमांक, राशि, दिनांक, प्रयोजन सहित) भेजें</label>
+      <div class="hint">संदेश ऊपर लिखे मोबाइल नंबर पर, वह न हो तो सदस्य के व्हाट्सऐप / मोबाइल नंबर पर जाएगा। व्हाट्सऐप गेटवे जुड़ा होना चाहिए।</div>
+    </div>
+    <% } %>
   </div>
   <div class="form-actions">
     <button class="btn btn-primary btn-lg" type="submit"><%- icon('save') %> <%= isNew ? 'प्रविष्टि सहेजें' : 'बदलाव सहेजें' %></button>

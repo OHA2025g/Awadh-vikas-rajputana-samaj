@@ -81,7 +81,7 @@ router.get('/whatsapp', async (req, res) => {
     pageTitle: 'व्हाट्सऐप प्रसारण',
     cfg: { ...cfg, cloud_token: cfg.cloud_token ? '••••••••' : '' },
     hasToken: Boolean(cfg.cloud_token),
-    gateway: gatewayStatus(),
+    gateway: await gatewayStatus(),
     variables: VARIABLES,
     mandals: await db.prepare('SELECT id, name FROM mandals ORDER BY sort_order, id').all(),
     committees: await db.prepare('SELECT id, name FROM committees ORDER BY sort_order, id').all(),
@@ -90,7 +90,7 @@ router.get('/whatsapp', async (req, res) => {
 });
 
 router.get('/whatsapp/status', async (req, res) => {
-  res.json({ ok: true, gateway: gatewayStatus() });
+  res.json({ ok: true, gateway: await gatewayStatus() });
 });
 
 router.post('/whatsapp/connect', async (req, res) => {
@@ -98,17 +98,17 @@ router.post('/whatsapp/connect', async (req, res) => {
     return res.status(422).json({ ok: false, error: 'QR गेटवे चुना हुआ नहीं है।' });
   }
   connectBaileys().catch((err) => console.error('[whatsapp]', err.message));
-  res.json({ ok: true, gateway: gatewayStatus() });
+  res.json({ ok: true, gateway: await gatewayStatus() });
 });
 
 router.post('/whatsapp/disconnect', async (req, res) => {
   await disconnectBaileys({ logout: false });
-  res.json({ ok: true, gateway: gatewayStatus() });
+  res.json({ ok: true, gateway: await gatewayStatus() });
 });
 
 router.post('/whatsapp/logout', requireSuper, async (req, res) => {
   await disconnectBaileys({ logout: true });
-  res.json({ ok: true, gateway: gatewayStatus() });
+  res.json({ ok: true, gateway: await gatewayStatus() });
 });
 
 router.post('/whatsapp/config', requireSuper, async (req, res) => {
@@ -163,7 +163,7 @@ router.post('/whatsapp/send', async (req, res) => {
   res.json({
     ok: true,
     broadcast: broadcastJson(await db.prepare('SELECT * FROM broadcasts WHERE id = ?').get(id)),
-    warning: isGatewayReady() ? null : 'गेटवे अभी जुड़ा नहीं है — प्रसारण रुका रहेगा। कनेक्ट करने के बाद "पुनः आरंभ" दबाएँ।',
+    warning: (await isGatewayReady()) ? null : 'गेटवे अभी जुड़ा नहीं है — प्रसारण रुका रहेगा। कनेक्ट करने के बाद "पुनः आरंभ" दबाएँ।',
   });
 });
 
@@ -201,14 +201,14 @@ router.post('/whatsapp/broadcasts/:id/:action', async (req, res) => {
       break;
     case 'resume':
       if (b.status === 'paused') {
-        if (!isGatewayReady()) return res.status(422).json({ ok: false, error: 'पहले व्हाट्सऐप गेटवे कनेक्ट करें।' });
+        if (!(await isGatewayReady())) return res.status(422).json({ ok: false, error: 'पहले व्हाट्सऐप गेटवे कनेक्ट करें।' });
         enqueueBroadcast(id);
       }
       break;
     case 'retry':
       await db.prepare("UPDATE broadcast_recipients SET status = 'pending', error = NULL WHERE broadcast_id = ? AND status = 'failed'").run(id);
       await db.prepare("UPDATE broadcasts SET failed = 0, status = 'paused' WHERE id = ?").run(id);
-      if (isGatewayReady()) enqueueBroadcast(id);
+      if (await isGatewayReady()) enqueueBroadcast(id);
       break;
     case 'cancel':
       await db.prepare("UPDATE broadcast_recipients SET status = 'skipped' WHERE broadcast_id = ? AND status = 'pending'").run(id);

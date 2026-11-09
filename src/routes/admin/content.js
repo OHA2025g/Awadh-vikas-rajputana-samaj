@@ -13,10 +13,15 @@ export const ICON_CHOICES = ['book-open', 'heart', 'flag', 'users', 'award', 'st
 
 /* ---------- Site settings ---------- */
 
-const SITE_TEXT_FIELDS = Object.keys(DEFAULT_SITE).filter((k) => !['logo', 'hero_image', 'wall_member_posts'].includes(k));
+const SITE_IMAGES = ['logo', 'hero_image', 'receipt_qr'];
+const SITE_TEXT_FIELDS = Object.keys(DEFAULT_SITE).filter((k) => ![...SITE_IMAGES, 'wall_member_posts'].includes(k));
 
 router.get('/site', async (req, res) => {
-  res.render('admin/site', { pageTitle: 'संस्था एवं वेबसाइट सेटिंग', s: await getSite() });
+  res.render('admin/site', {
+    pageTitle: 'संस्था एवं वेबसाइट सेटिंग',
+    s: await getSite(),
+    receiptStart: Number(await getSetting('receipt_start', 1)) || 1,
+  });
 });
 
 router.post('/site', async (req, res) => {
@@ -29,7 +34,10 @@ router.post('/site', async (req, res) => {
   }
   saved.member_prefix = (str(body.member_prefix, 10).replace(/[^A-Za-z0-9]/g, '') || 'ARVS').toUpperCase();
   saved.wall_member_posts = Boolean(bool(body.wall_member_posts));
-  for (const key of ['logo', 'hero_image']) {
+  saved.upi_id = /^[\w.-]{2,64}@[\w.-]{2,64}$/.test(str(body.upi_id, 140)) ? str(body.upi_id, 140) : '';
+  const receiptStart = int(body.receipt_start);
+  if (receiptStart && receiptStart > 0) await setSetting('receipt_start', receiptStart);
+  for (const key of SITE_IMAGES) {
     const file = fileFor(req, key);
     if (file) {
       saved[key] = saveImage(file.buffer);

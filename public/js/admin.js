@@ -81,6 +81,32 @@
     formDates.forEach((el) => el.addEventListener('input', () => syncDates(el)));
   }
 
+  /* सहयोग: entries chosen for receipt printing (checkboxes live in the table, outside the form) */
+  const receiptForm = $('#receipt-form');
+  if (receiptForm) {
+    const boxes = () => $$('input[form="receipt-form"][name="ids"]');
+    const all = $('[data-receipt-all]');
+    const printBtn = $('[data-receipt-print]', receiptForm);
+    const count = $('[data-receipt-count]', receiptForm);
+    const update = () => {
+      const n = boxes().filter((b) => b.checked).length;
+      printBtn.disabled = n === 0;
+      count.textContent = n;
+      if (all) {
+        all.checked = n > 0 && n === boxes().length;
+        all.indeterminate = n > 0 && n < boxes().length;
+      }
+    };
+    all?.addEventListener('change', () => {
+      boxes().forEach((b) => (b.checked = all.checked));
+      update();
+    });
+    document.addEventListener('change', (e) => {
+      if (e.target.matches?.('input[form="receipt-form"][name="ids"]')) update();
+    });
+    update();
+  }
+
   /* Bulk selection */
   $$('[data-bulk]').forEach((form) => {
     const all = $('[data-select-all]', form);

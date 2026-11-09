@@ -127,6 +127,39 @@ export function todayISO() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
 }
 
+const HINDI_0_99 = (
+  'शून्य एक दो तीन चार पाँच छह सात आठ नौ दस ग्यारह बारह तेरह चौदह पंद्रह सोलह सत्रह अठारह उन्नीस ' +
+  'बीस इक्कीस बाईस तेईस चौबीस पच्चीस छब्बीस सत्ताईस अट्ठाईस उनतीस तीस इकतीस बत्तीस तैंतीस चौंतीस पैंतीस छत्तीस सैंतीस अड़तीस उनतालीस ' +
+  'चालीस इकतालीस बयालीस तैंतालीस चवालीस पैंतालीस छियालीस सैंतालीस अड़तालीस उनचास पचास इक्यावन बावन तिरपन चौवन पचपन छप्पन सत्तावन अट्ठावन उनसठ ' +
+  'साठ इकसठ बासठ तिरसठ चौंसठ पैंसठ छियासठ सड़सठ अड़सठ उनहत्तर सत्तर इकहत्तर बहत्तर तिहत्तर चौहत्तर पचहत्तर छिहत्तर सतहत्तर अठहत्तर उनासी ' +
+  'अस्सी इक्यासी बयासी तिरासी चौरासी पचासी छियासी सत्तासी अट्ठासी नवासी नब्बे इक्यानवे बानवे तिरानवे चौरानवे पचानवे छियानवे सत्तानवे अट्ठानवे निन्यानवे'
+).split(' ');
+
+/** Whole number in Hindi words with Indian grouping: 125000 → "एक लाख पच्चीस हज़ार". */
+export function numberInWordsHi(value) {
+  let n = Math.floor(Math.abs(Number(value) || 0));
+  if (n < 100) return HINDI_0_99[n];
+  const parts = [];
+  const crore = Math.floor(n / 1e7);
+  if (crore) parts.push(`${numberInWordsHi(crore)} करोड़`);
+  n %= 1e7;
+  for (const [size, word] of [[1e5, 'लाख'], [1e3, 'हज़ार'], [100, 'सौ']]) {
+    const count = Math.floor(n / size);
+    if (count) parts.push(`${HINDI_0_99[count]} ${word}`);
+    n %= size;
+  }
+  if (n) parts.push(HINDI_0_99[n]);
+  return parts.join(' ');
+}
+
+/** 110050 paise → "एक हज़ार एक सौ रुपये पचास पैसे मात्र" */
+export function amountInWordsHi(paise) {
+  const p = Math.round(Number(paise) || 0);
+  const rupees = Math.floor(p / 100);
+  const rest = p % 100;
+  return `${numberInWordsHi(rupees)} रुपये${rest ? ` ${HINDI_0_99[rest]} पैसे` : ''} मात्र`;
+}
+
 /** Calendar date in Asia/Kolkata as YYYY-MM-DD, for `<input type="date">`. */
 export function isoDate(value) {
   const d = parseDate(value);

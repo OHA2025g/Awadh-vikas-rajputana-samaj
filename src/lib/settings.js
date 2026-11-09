@@ -27,6 +27,13 @@ export const DEFAULT_SITE = {
     'अवध राजपूत विकास संघ पुणे एवं आसपास बसे अवध क्षेत्र के राजपूत परिवारों को एक सूत्र में पिरोने वाली सामाजिक संस्था है।',
   member_prefix: 'ARVS',
   wall_member_posts: true,
+  bank_name: 'Canara Bank',
+  bank_account_name: 'Avadh Rajput Vikas Sangh',
+  bank_branch: 'Chinchwad',
+  bank_account_no: '120035297560',
+  bank_ifsc: 'CNRB0015322',
+  upi_id: '',
+  receipt_qr: '',
 };
 
 export const DEFAULT_WHATSAPP = {

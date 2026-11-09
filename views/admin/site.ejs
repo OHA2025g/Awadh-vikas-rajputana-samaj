@@ -80,6 +80,34 @@
   </section>
 
   <section class="card">
+    <div class="card-head"><h2><%- icon('file-text') %> सहयोग रसीद — बैंक विवरण एवं QR</h2></div>
+    <div class="card-body grid cols-3">
+      <%- input('bank_name', 'बैंक का नाम') %>
+      <%- input('bank_account_name', 'खाताधारक का नाम (Account Holder)') %>
+      <%- input('bank_branch', 'शाखा (Branch)') %>
+      <%- input('bank_account_no', 'खाता संख्या (A/C No.)') %>
+      <%- input('bank_ifsc', 'IFSC कोड') %>
+      <%- input('upi_id', 'UPI ID', { attrs: 'placeholder="जैसे: sangh@canarabank"', hint: 'QR चित्र अपलोड न हो तो इसी UPI ID से रसीद पर QR बनता है।' }) %>
+      <div class="field">
+        <span class="label">रसीद पर QR चित्र</span>
+        <div class="img-field">
+          <img id="qr-prev" src="<%= s.receipt_qr %>" alt="" style="object-fit:contain;background:#fff" <%= s.receipt_qr ? '' : 'hidden' %>>
+          <div class="stack" style="gap:6px">
+            <input type="file" name="receipt_qr" accept="image/png,image/jpeg,image/webp" data-preview="#qr-prev">
+            <% if (s.receipt_qr) { %><label class="check small"><input type="checkbox" name="reset_receipt_qr" value="1"> QR चित्र हटाएँ</label><% } %>
+          </div>
+        </div>
+        <div class="hint">बैंक / UPI ऐप से डाउनलोड किया गया QR (वर्गाकार चित्र)।</div>
+      </div>
+      <div class="field">
+        <label for="f-receipt_start">रसीद क्रमांक कम से कम</label>
+        <input type="number" id="f-receipt_start" name="receipt_start" min="1" value="<%= receiptStart %>">
+        <div class="hint">नई प्रविष्टि को अगला क्रमांक मिलता है, पर इससे कम नहीं — जैसे कागज़ी रसीद बुक 741 तक चली हो तो 742 लिखें।</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
     <div class="card-head"><h2><%- icon('layout') %> फ़ुटर एवं सामुदायिक मंच</h2></div>
     <div class="card-body grid cols-2">
       <%- area('footer_about', 'फ़ुटर में संस्था परिचय', 3) %>
