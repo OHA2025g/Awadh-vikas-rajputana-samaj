@@ -14,7 +14,7 @@
       <form class="form-card" id="join-form" action="/join" method="post" enctype="multipart/form-data" novalidate>
         <div class="alert alert-error" id="join-error" hidden><%- icon('alert') %><span></span></div>
 
-        <%- include('../partials/membership-form', { mf: { mode: 'edit', m: {}, secure: true, applicant: true, dateText: today } }) %>
+        <%- include('../partials/membership-form', { mf: { mode: 'edit', m: {}, secure: true, applicant: true, dateText: today, vidhanSabhas } }) %>
 
         <input class="hp-field" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
         <div class="form-footer">

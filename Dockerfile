@@ -11,8 +11,9 @@ RUN npm ci --omit=dev
 FROM node:20-bookworm-slim
 WORKDIR /app
 
+# Chromium renders the सहयोग रसीद PDF sent on WhatsApp; Noto supplies Devanagari glyphs.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates \
+  && apt-get install -y --no-install-recommends ca-certificates chromium fonts-noto-core \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/node_modules ./node_modules
@@ -27,6 +28,7 @@ RUN mkdir -p /app/data/uploads /app/data/private /app/data/wa-auth
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/app/data
+ENV CHROME_PATH=/usr/bin/chromium
 EXPOSE 3000
 
 # Run as root so an EasyPanel volume mounted on /app/data is writable.

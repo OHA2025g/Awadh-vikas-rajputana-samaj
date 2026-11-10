@@ -1,6 +1,5 @@
 import express from 'express';
 import ExcelJS from 'exceljs';
-import QRCode from 'qrcode';
 import { db } from '../../db.js';
 import {
   DONATION_CATEGORY_KEYS,
@@ -11,7 +10,7 @@ import {
 } from '../../config.js';
 import { flash, requireSuper } from '../../middleware/auth.js';
 import { donationFilters, listDonations, allDonations, getDonation, donationTotals } from '../../lib/donations.js';
-import { RECEIPT_REASONS, donationPhone, nextReceiptNo, sendDonationThanks } from '../../lib/donation-receipt.js';
+import { RECEIPT_REASONS, nextReceiptNo, receiptQr, receiptView, sendDonationThanks } from '../../lib/donation-receipt.js';
 import { likeTerm } from '../../lib/members.js';
 import { getSite } from '../../lib/settings.js';
 import {
@@ -28,7 +27,6 @@ import {
   normalizePhone,
   formatPhone,
   maskPhone,
-  amountInWordsHi,
 } from '../../lib/util.js';
 
 const router = express.Router();
@@ -218,8 +216,13 @@ async function insertWithReceiptNo(row) {
   }
 }
 
-const whatsappNote = (result) =>
-  result.ok ? ' धन्यवाद संदेश व्हाट्सऐप पर भेजा गया।' : ` व्हाट्सऐप संदेश नहीं भेजा जा सका: ${result.error}`;
+function whatsappNote(result) {
+  if (!result.ok) return ` व्हाट्सऐप संदेश नहीं भेजा जा सका: ${result.error}`;
+  if (result.pdfError) return ` धन्यवाद संदेश व्हाट्सऐप पर भेजा गया, पर PDF रसीद नहीं जा सकी: ${result.pdfError}`;
+  return ' धन्यवाद संदेश व PDF रसीद व्हाट्सऐप पर भेजी गई।';
+}
+
+const whatsappFlashType = (result, failType) => (!result.ok ? failType : result.pdfError ? 'warn' : 'success');
 
 router.post('/donations', async (req, res) => {
   const { v, errors, formValues } = await parseDonation(req.body ?? {});
@@ -238,10 +241,8 @@ router.post('/donations', async (req, res) => {
   if (bool(req.body?.send_whatsapp)) {
     const result = await sendDonationThanks(id);
     msg += whatsappNote(result);
-    if (!result.ok) {
-      msg += ' — सूची में व्हाट्सऐप बटन से दोबारा भेज सकते हैं।';
-      type = 'warn';
-    }
+    type = whatsappFlashType(result, 'warn');
+    if (type !== 'success') msg += ' — सूची में व्हाट्सऐप बटन से दोबारा भेज सकते हैं।';
   }
   flash(req, type, msg);
   res.redirect(req.body?.again ? `/admin/donations/new?category=${v.category}` : `/admin/donations?category=${v.category}`);
@@ -251,7 +252,7 @@ router.post('/donations/:id/whatsapp', async (req, res, next) => {
   const d = await getDonation(req.params.id);
   if (!d) return next();
   const result = await sendDonationThanks(d.id);
-  flash(req, result.ok ? 'success' : 'error', `रसीद ${d.receipt_no} (${d.name}):${whatsappNote(result)}`);
+  flash(req, whatsappFlashType(result, 'error'), `रसीद ${d.receipt_no} (${d.name}):${whatsappNote(result)}`);
   res.redirect(String(req.body?.back || '').startsWith('/admin/donations') ? req.body.back : '/admin/donations');
 });
 
@@ -261,13 +262,6 @@ function receiptIds(value) {
   return [...new Set([].concat(value || []).flatMap((v) => String(v).split(',')).map(Number))]
     .filter((n) => Number.isInteger(n) && n > 0)
     .slice(0, 200);
-}
-
-async function receiptQr(site) {
-  if (site.receipt_qr) return site.receipt_qr;
-  if (!site.upi_id) return '';
-  const params = new URLSearchParams({ pa: site.upi_id, pn: site.org_name_en || site.org_name, cu: 'INR' });
-  return QRCode.toDataURL(`upi://pay?${params}`, { margin: 0, width: 240 });
 }
 
 router.get('/donations/receipts', async (req, res) => {
@@ -284,19 +278,12 @@ router.get('/donations/receipts', async (req, res) => {
   }
   const site = await getSite();
   const showPhone = req.admin.role === 'superadmin' ? formatPhone : maskPhone;
-  const receipts = rows.map((d) => {
-    const phone = donationPhone(d);
-    return {
-      ...d,
-      date_out: formatDate(d.paid_on, 'numeric'),
-      phone_out: phone ? showPhone(phone) : '',
-      residence: d.member_address || d.member_city || '',
-      amount_out: formatINR(d.amount_paise),
-      words_out: amountInWordsHi(d.amount_paise),
-      mode_out: [PAYMENT_MODE_LABEL[d.payment_mode] || d.payment_mode, d.reference].filter(Boolean).join(' — '),
-    };
+  res.render('admin/receipt-print', {
+    site,
+    receipts: rows.map((d) => receiptView(d, showPhone)),
+    reasons: RECEIPT_REASONS,
+    qr: await receiptQr(site),
   });
-  res.render('admin/receipt-print', { site, receipts, reasons: RECEIPT_REASONS, qr: await receiptQr(site) });
 });
 
 router.get('/donations/:id/edit', async (req, res, next) => {

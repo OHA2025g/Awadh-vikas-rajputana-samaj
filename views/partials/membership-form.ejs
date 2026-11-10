@@ -9,8 +9,9 @@
    *   mf.dateEditable admin only: दिनांक is an editable date (public join stays fixed)
    *   mf.dateValue    YYYY-MM-DD for that input
    *   mf.dateMax      latest allowed YYYY-MM-DD
+   *   mf.vidhanSabhas known विधानसभा (= मंडल) names offered as suggestions
    */
-  const { mode = 'view', m = {}, secure = false, applicant = false, dateText = '', dateEditable = false, dateValue = '', dateMax = '' } = mf;
+  const { mode = 'view', m = {}, secure = false, applicant = false, dateText = '', dateEditable = false, dateValue = '', dateMax = '', vidhanSabhas = [] } = mf;
   const edit = mode === 'edit';
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const dn = (n) => String(n).replace(/\d/g, (d) => '०१२३४५६७८९'[d]);
@@ -42,6 +43,7 @@
       o.req && applicant ? 'required' : '',
       o.autocomplete ? `autocomplete="${o.autocomplete}"` : '',
       o.placeholder ? `placeholder="${esc(o.placeholder)}"` : '',
+      o.list ? `list="${o.list}"` : '',
     ].filter(Boolean).join(' ');
     const input = o.textarea
       ? `<textarea class="mf-in" ${attrs} rows="2">${esc(value)}</textarea>`
@@ -130,7 +132,10 @@
   </div>
   <div class="mf-row">
     <%- blank('ward_no', 'प्रभाग नंबर :', { max: 30 }) %>
-    <%- blank('vidhan_sabha', 'विधानसभा :') %>
+    <%- blank('vidhan_sabha', 'विधानसभा :', vidhanSabhas.length ? { list: 'mf-vidhan-sabhas' } : {}) %>
+    <% if (edit && vidhanSabhas.length) { %>
+      <datalist id="mf-vidhan-sabhas"><% vidhanSabhas.forEach((n) => { %><option value="<%= n %>"><% }) %></datalist>
+    <% } %>
   </div>
   <div class="mf-row">
     <%- blank('district', 'जिला :', { w: 'w-sm', value: defaultValue('district', 'पुणे') }) %>

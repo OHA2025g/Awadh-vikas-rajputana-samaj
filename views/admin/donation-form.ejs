@@ -108,7 +108,7 @@
 
     <% if (isNew) { %>
     <div class="field span-all">
-      <label class="check"><input type="checkbox" name="send_whatsapp" value="1" <%= d.send_whatsapp ? 'checked' : '' %>> <%- icon('whatsapp') %> सहेजते ही व्हाट्सऐप पर धन्यवाद व पुष्टि संदेश (रसीद क्रमांक, राशि, दिनांक, प्रयोजन सहित) भेजें</label>
+      <label class="check"><input type="checkbox" name="send_whatsapp" value="1" <%= d.send_whatsapp ? 'checked' : '' %>> <%- icon('whatsapp') %> सहेजते ही व्हाट्सऐप पर धन्यवाद व पुष्टि संदेश (रसीद क्रमांक, राशि, दिनांक, प्रयोजन सहित) और PDF रसीद भेजें</label>
       <div class="hint">संदेश ऊपर लिखे मोबाइल नंबर पर, वह न हो तो सदस्य के व्हाट्सऐप / मोबाइल नंबर पर जाएगा। व्हाट्सऐप गेटवे जुड़ा होना चाहिए।</div>
     </div>
     <% } %>

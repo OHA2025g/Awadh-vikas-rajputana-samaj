@@ -113,7 +113,8 @@
               <div class="small"><%= d.admin_name || d.admin_username || '—' %></div>
               <div class="cell-sub"><%= d.updated_at ? 'संपादित ' + formatDate(d.updated_at, 'short') : formatDate(d.created_at, 'short') %></div>
               <% if (d.wa_status === 'sent') { %>
-                <div class="cell-sub wa-ok" title="<%= formatDate(d.wa_sent_at, 'datetime') %>"><%- icon('whatsapp') %> संदेश भेजा</div>
+                <div class="cell-sub wa-ok" title="<%= formatDate(d.wa_sent_at, 'datetime') %>"><%- icon('whatsapp') %> <%= d.wa_error ? 'संदेश भेजा' : 'संदेश व PDF भेजे' %></div>
+                <% if (d.wa_error) { %><div class="cell-sub wa-fail" title="<%= d.wa_error %>"><%- icon('alert') %> PDF नहीं गया</div><% } %>
               <% } else if (d.wa_status) { %>
                 <div class="cell-sub wa-fail" title="<%= d.wa_error || '' %>"><%- icon('alert') %> <%= d.wa_status === 'no_phone' ? 'मोबाइल नंबर नहीं' : 'संदेश नहीं गया' %></div>
               <% } %>

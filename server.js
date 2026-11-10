@@ -11,12 +11,14 @@ import { loadAdmin } from './src/middleware/auth.js';
 import { UploadError } from './src/lib/uploads.js';
 import { autoStartWhatsApp } from './src/lib/whatsapp.js';
 import { pauseInterruptedBroadcasts } from './src/lib/broadcast.js';
+import { syncMandals } from './src/lib/mandals.js';
 import publicRoutes from './src/routes/public.js';
 import apiRoutes from './src/routes/api.js';
 import adminRoutes from './src/routes/admin/index.js';
 
 await seedIfEmpty();
 await pauseInterruptedBroadcasts();
+await syncMandals();
 
 const app = express();
 app.set('view engine', 'ejs');

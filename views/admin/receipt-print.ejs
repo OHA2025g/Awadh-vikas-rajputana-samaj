@@ -3,13 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <% if (locals.baseHref) { %><base href="<%= baseHref %>"><% } %>
   <title>रसीद <%= receipts.map((r) => r.receipt_no).join(', ') %> | <%= site.org_name %></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/css/receipt.css">
+  <% if (locals.single) { %><style>@page { size: 210mm 148.5mm; margin: 0; }</style><% } %>
 </head>
-<body>
+<body<%- locals.single ? ' class="rc-single"' : '' %>>
 <%
   const swastik =
     '<svg class="rc-sw" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12V4h7M12 12h8v7M12 12v8H5M12 12H4V5"/>' +

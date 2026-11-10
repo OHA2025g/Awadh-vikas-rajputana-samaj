@@ -4,6 +4,7 @@ import { PEOPLE_GROUPS } from '../../config.js';
 import { flash } from '../../middleware/auth.js';
 import { getSite, setSetting, getSetting, DEFAULT_SITE } from '../../lib/settings.js';
 import { cleanHtml } from '../../lib/sanitize.js';
+import { afterMandalRenamed, mandalMemberCount } from '../../lib/mandals.js';
 import { fileFor, filesFor, saveImage, removeUpload } from '../../lib/uploads.js';
 import { str, text, int, bool, slugify } from '../../lib/util.js';
 
@@ -303,7 +304,14 @@ const RESOURCES = {
     table: 'mandals',
     title: 'मंडल',
     singular: 'मंडल',
-    help: 'सदस्य निर्देशिका एवं आवेदन फ़ॉर्म में दिखने वाले प्रशासनिक मंडल। मंडल हटाने पर उसके सदस्यों का मंडल खाली हो जाएगा।',
+    help:
+      'मंडल = सदस्यता फ़ॉर्म में लिखी विधानसभा। फ़ॉर्म में नई विधानसभा लिखते ही नया मंडल अपने आप बन जाता है। नाम बदलने पर उन सदस्यों के फ़ॉर्म की विधानसभा भी बदल जाती है; किसी दूसरे मंडल का नाम देने पर दोनों मंडल एक हो जाते हैं (जैसे "Bhosari" और "भोसरी")। जिस मंडल में सदस्य हैं, उसे हटाया नहीं जा सकता।',
+    afterUpdate: async (id, values) =>
+      (await afterMandalRenamed(id, values.name)) ? 'इसी नाम का मंडल पहले से था — दोनों मंडल एक कर दिए गए।' : null,
+    beforeDelete: async (id) => {
+      const n = await mandalMemberCount(id);
+      return n ? `इस मंडल में ${n} सदस्य हैं — पहले उनकी विधानसभा बदलें या इसे किसी दूसरे मंडल के नाम में बदलकर एक करें।` : null;
+    },
     orderBy: 'sort_order, id',
     sortable: true,
     columns: [
@@ -456,14 +464,18 @@ router.post('/r/:res/:id', resource, async (req, res, next) => {
   applyFiles(r, req, values, existing);
   const cols = Object.keys(values);
   await db.prepare(`UPDATE ${r.table} SET ${cols.map((c) => `${c} = @${c}`).join(', ')} WHERE id = @id`).run({ ...values, id: existing.id });
-  flash(req, 'success', 'परिवर्तन सहेजे गए।');
+  const note = r.afterUpdate ? await r.afterUpdate(existing.id, values) : null;
+  flash(req, 'success', note ? `परिवर्तन सहेजे गए। ${note}` : 'परिवर्तन सहेजे गए।');
   res.redirect(`/admin/r/${req.params.res}`);
 });
 
 router.post('/r/:res/:id/delete', resource, async (req, res) => {
   const r = req.resource;
   const row = await db.prepare(`SELECT * FROM ${r.table} WHERE id = ?`).get(int(req.params.id, 0));
-  if (row) {
+  const blocked = row && r.beforeDelete ? await r.beforeDelete(row.id) : null;
+  if (blocked) {
+    flash(req, 'error', blocked);
+  } else if (row) {
     await db.prepare(`DELETE FROM ${r.table} WHERE id = ?`).run(row.id);
     for (const f of r.fields) {
       if (f.type === 'image') removeUpload(row[f.name]);

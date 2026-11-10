@@ -322,6 +322,7 @@ body {
 }
 
 .rc-qr {
+  grid-column: 2;
   display: grid;
   justify-items: center;
   gap: 0.5mm;
@@ -337,6 +338,7 @@ body {
 }
 
 .rc-sig {
+  grid-column: 3;
   display: grid;
   justify-items: center;
   gap: 0.5mm;
@@ -352,6 +354,7 @@ body {
 }
 
 .rc-office {
+  grid-column: 4;
   border-left: 0.35mm solid var(--rc-ink);
   border-top: 0.35mm solid var(--rc-ink);
   align-self: stretch;
@@ -412,4 +415,10 @@ body {
     break-after: auto;
     page-break-after: auto;
   }
+}
+
+/* One receipt on its own A5-landscape page (the PDF sent on WhatsApp); the page size is set in the view. */
+.rc-single .rc-page {
+  height: 148.5mm;
+  grid-template-rows: 148.5mm;
 }

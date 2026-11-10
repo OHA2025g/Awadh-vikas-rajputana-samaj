@@ -31,7 +31,7 @@
           <div class="flash info" style="margin:14px 20px 0"><%- icon('lock') %> <span>मोबाइल, आधार नंबर व परिवार / रिलेशन की तालिकाएँ केवल मुख्य एडमिन बदल सकते हैं।</span></div>
         <% } %>
         <div class="card-body">
-          <%- include('../partials/membership-form', { mf: { mode: 'edit', m, secure: isSuper, dateText: formDate, dateEditable: true, dateValue: formDateIso, dateMax: formDateMax } }) %>
+          <%- include('../partials/membership-form', { mf: { mode: 'edit', m, secure: isSuper, dateText: formDate, dateEditable: true, dateValue: formDateIso, dateMax: formDateMax, vidhanSabhas: mandals.map((md) => md.name) } }) %>
         </div>
       </section>
 
@@ -113,11 +113,12 @@
             <input type="text" id="designation" name="designation" value="<%= val('designation') %>" maxlength="80" placeholder="जैसे: अध्यक्ष, सचिव, कोषाध्यक्ष">
           </div>
           <div class="field">
-            <label for="mandal_id">मंडल</label>
-            <select id="mandal_id" name="mandal_id">
+            <label for="mandal_id">मंडल (विधानसभा)</label>
+            <select id="mandal_id" name="mandal_id" data-mandal-select>
               <option value="">— चुनें —</option>
               <% mandals.forEach((md) => { %><option value="<%= md.id %>" <%= Number(m.mandal_id) === md.id ? 'selected' : '' %>><%= md.name %></option><% }) %>
             </select>
+            <div class="hint">फ़ॉर्म में लिखी विधानसभा ही मंडल है — एक बदलने पर दूसरा अपने आप बदलता है। नई विधानसभा लिखने पर नया मंडल बन जाएगा।</div>
           </div>
           <div class="field">
             <label for="committee_id">समिति</label>

@@ -14,6 +14,7 @@ import {
   clearCertificatesPrinted,
 } from '../../lib/members.js';
 import { parseFormFields, formRows } from '../../lib/membership-form.js';
+import { alignMandal, setMembersMandal } from '../../lib/mandals.js';
 import { fileFor, saveImage, removeUpload, privatePath } from '../../lib/uploads.js';
 import {
   str,
@@ -91,15 +92,17 @@ router.post('/applications/:id/approve', async (req, res) => {
   const b = req.body ?? {};
   const m = await getMember(id);
   const has = (k) => b[k] !== undefined;
+  const pickedMandal = has('mandal_id') ? int(b.mandal_id) : m?.mandal_id;
   const memberNo =
     m &&
     (await approveMember(id, {
       category: CATEGORY_KEYS.includes(b.category) ? b.category : m.category || 'sadasya',
       designation: has('designation') ? str(b.designation, 80) || null : m.designation,
-      mandal_id: has('mandal_id') ? int(b.mandal_id) : m.mandal_id,
+      mandal_id: pickedMandal,
       committee_id: has('committee_id') ? int(b.committee_id) : m.committee_id,
       show_in_directory: has('show_in_directory') || has('category') ? bool(b.show_in_directory) : 1,
     }));
+  if (memberNo && pickedMandal && pickedMandal !== m.mandal_id) await setMembersMandal([id], pickedMandal);
   if (!memberNo) {
     flash(req, 'error', 'आवेदन नहीं मिला।');
   } else {
@@ -213,6 +216,7 @@ router.post('/members', requireSuper, async (req, res) => {
     errors.push('इस मोबाइल नंबर से सदस्य पहले से मौजूद है।');
   }
   if (errors.length) return await renderForm(res, { ...v, ...req.body, id: null }, { errors });
+  await alignMandal(v);
   const photoFile = fileFor(req, 'photo');
   const photo = photoFile ? saveImage(photoFile.buffer) : null;
   const id = await tx(async () => {
@@ -254,8 +258,8 @@ router.post('/members/bulk', async (req, res) => {
     case 'mandal': {
       const mandalId = int(body.mandal_id);
       if (mandalId) {
-        await db.prepare(`UPDATE members SET mandal_id = ? WHERE id IN (${placeholders})`).run(mandalId, ...ids);
-        flash(req, 'success', `${ids.length} सदस्यों का मंडल बदला गया।`);
+        await setMembersMandal(ids, mandalId);
+        flash(req, 'success', `${ids.length} सदस्यों का मंडल (विधानसभा) बदला गया।`);
       }
       break;
     }
@@ -314,6 +318,7 @@ router.post('/members/:id', async (req, res, next) => {
     if (dup) errors.push('यह मोबाइल नंबर किसी अन्य सदस्य के नाम पर है।');
   }
   if (errors.length) return await renderForm(res, { ...existing, ...v, form_date: body.form_date }, { errors });
+  await alignMandal(v);
 
   let photo = existing.photo;
   const photoFile = fileFor(req, 'photo');

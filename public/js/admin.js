@@ -81,6 +81,20 @@
     formDates.forEach((el) => el.addEventListener('input', () => syncDates(el)));
   }
 
+  /* मंडल = विधानसभा: the dropdown and the form's विधानसभा blank mirror each other. */
+  const mandalSelect = $('[data-mandal-select]');
+  const vidhanSabha = $('#mf-vidhan_sabha');
+  if (mandalSelect && vidhanSabha) {
+    const norm = (s) => s.trim().toLowerCase();
+    mandalSelect.addEventListener('change', () => {
+      vidhanSabha.value = mandalSelect.value ? mandalSelect.selectedOptions[0].textContent.trim() : '';
+    });
+    vidhanSabha.addEventListener('input', () => {
+      const match = [...mandalSelect.options].find((o) => o.value && norm(o.textContent) === norm(vidhanSabha.value));
+      mandalSelect.value = match ? match.value : '';
+    });
+  }
+
   /* सहयोग: entries chosen for receipt printing (checkboxes live in the table, outside the form) */
   const receiptForm = $('#receipt-form');
   if (receiptForm) {

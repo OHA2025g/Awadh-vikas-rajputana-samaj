@@ -6,6 +6,7 @@ import { POST_CATEGORIES, DONATION_CATEGORIES, PAYMENT_MODE_LABEL } from '../con
 import { categoryCounts, findActiveByPhone, nextApplicationNo, toPublicMember, listMembers } from '../lib/members.js';
 import { donationFilters, donationTotals, listDonations } from '../lib/donations.js';
 import { parseFormFields } from '../lib/membership-form.js';
+import { alignMandal, mandalNames } from '../lib/mandals.js';
 import { publicUpload, saveImage, saveDataUrlImage, UploadError } from '../lib/uploads.js';
 import { str, text, int, normalizePhone, todayISO, paginate, formatDate, formatINR, maskReference } from '../lib/util.js';
 
@@ -124,6 +125,7 @@ router.get('/join', async (req, res) => {
     pageTitle: 'सदस्यता फॉर्म',
     extraStyles: ['/css/membership-form.css'],
     today: formatDate(new Date(), 'numeric'),
+    vidhanSabhas: await mandalNames(),
   });
 });
 
@@ -163,7 +165,7 @@ router.post('/join', joinLimiter, publicUpload.single('photo'), async (req, res)
     throw err;
   }
 
-  const row = { ...v, photo, signature };
+  const row = await alignMandal({ ...v, photo, signature });
   const cols = Object.keys(row);
   const info = await db
     .prepare(

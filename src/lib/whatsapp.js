@@ -199,7 +199,34 @@ export async function sendWhatsApp(phone, text) {
   }
 }
 
+/** document: { buffer, fileName, caption } — sent as a PDF attachment. */
+export async function sendWhatsAppDocument(phone, document) {
+  const cfg = await getWhatsAppConfig();
+  switch (cfg.provider) {
+    case 'baileys': {
+      const jid = await baileysJid(phone);
+      await sock.sendMessage(jid, {
+        document: document.buffer,
+        mimetype: 'application/pdf',
+        fileName: document.fileName,
+        caption: document.caption,
+      });
+      return;
+    }
+    case 'cloud':
+      return sendDocumentViaCloud(cfg, phone, document);
+    case 'none':
+      throw new GatewayNotReadyError('व्हाट्सऐप गेटवे बंद है।');
+    default:
+      throw new GatewayNotReadyError(`अज्ञात गेटवे: ${cfg.provider}`);
+  }
+}
+
 async function sendViaBaileys(phone, text) {
+  await sock.sendMessage(await baileysJid(phone), { text });
+}
+
+async function baileysJid(phone) {
   if (!sock || gateway.status !== 'connected') {
     throw new GatewayNotReadyError('व्हाट्सऐप जुड़ा नहीं है।');
   }
@@ -215,16 +242,49 @@ async function sendViaBaileys(phone, text) {
     // The existence lookup is best-effort; fall through and attempt delivery.
   }
   if (!exists) throw new Error('यह नंबर व्हाट्सऐप पर पंजीकृत नहीं है।');
-  await sock.sendMessage(jid, { text });
+  return jid;
 }
 
-async function sendViaCloud(cfg, phone, text) {
+function cloudUrl(cfg, endpoint) {
   if (!cfg.cloud_phone_id || !cfg.cloud_token) {
     throw new GatewayNotReadyError('Cloud API सेटिंग अधूरी है।');
   }
-  const url = `https://graph.facebook.com/${encodeURIComponent(cfg.cloud_api_version || 'v23.0')}/${encodeURIComponent(
+  return `https://graph.facebook.com/${encodeURIComponent(cfg.cloud_api_version || 'v23.0')}/${encodeURIComponent(
     cfg.cloud_phone_id
-  )}/messages`;
+  )}/${endpoint}`;
+}
+
+async function cloudFetch(cfg, url, init) {
+  const res = await fetch(url, {
+    ...init,
+    headers: { Authorization: `Bearer ${cfg.cloud_token}`, ...init.headers },
+    signal: AbortSignal.timeout(20000),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error?.message || `Cloud API त्रुटि (HTTP ${res.status})`);
+  return body;
+}
+
+async function sendDocumentViaCloud(cfg, phone, document) {
+  const form = new FormData();
+  form.append('messaging_product', 'whatsapp');
+  form.append('type', 'application/pdf');
+  form.append('file', new Blob([document.buffer], { type: 'application/pdf' }), document.fileName);
+  const media = await cloudFetch(cfg, cloudUrl(cfg, 'media'), { method: 'POST', body: form });
+  await cloudFetch(cfg, cloudUrl(cfg, 'messages'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: phone,
+      type: 'document',
+      document: { id: media.id, filename: document.fileName, caption: document.caption },
+    }),
+  });
+}
+
+async function sendViaCloud(cfg, phone, text) {
+  const url = cloudUrl(cfg, 'messages');
   // Business-initiated messages outside the 24h window must use an approved template.
   const payload = cfg.cloud_template
     ? {
@@ -244,14 +304,5 @@ async function sendViaCloud(cfg, phone, text) {
       }
     : { messaging_product: 'whatsapp', to: phone, type: 'text', text: { body: text, preview_url: false } };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${cfg.cloud_token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.error?.message || `Cloud API त्रुटि (HTTP ${res.status})`);
-  }
+  await cloudFetch(cfg, url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 }

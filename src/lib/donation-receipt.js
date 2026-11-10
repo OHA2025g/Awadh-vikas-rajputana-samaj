@@ -1,11 +1,17 @@
+import path from 'node:path';
+import ejs from 'ejs';
+import QRCode from 'qrcode';
 import { db } from '../db.js';
-import { DONATION_CATEGORY_LABEL, PAYMENT_MODE_LABEL } from '../config.js';
+import { DONATION_CATEGORY_LABEL, PAYMENT_MODE_LABEL, PORT, ROOT } from '../config.js';
 import { getDonation } from './donations.js';
 import { getSetting, getSite } from './settings.js';
-import { sendWhatsApp } from './whatsapp.js';
-import { normalizePhone, formatINR, formatDate, amountInWordsHi } from './util.js';
+import { sendWhatsApp, sendWhatsAppDocument } from './whatsapp.js';
+import { htmlToReceiptPdf } from './receipt-pdf.js';
+import { normalizePhone, formatINR, formatDate, formatPhone, amountInWordsHi } from './util.js';
 
 const SEND_TIMEOUT_MS = 25_000;
+const PDF_TIMEOUT_MS = 45_000;
+const RECEIPT_VIEW = path.join(ROOT, 'views', 'admin', 'receipt-print.ejs');
 
 /** Reasons in the order and wording of the printed रसीद. */
 export const RECEIPT_REASONS = [
@@ -25,6 +31,51 @@ export async function nextReceiptNo() {
   const start = Number(await getSetting('receipt_start', 1)) || 1;
   const { last } = await db.prepare('SELECT COALESCE(MAX(receipt_no), 0) AS last FROM donations').get();
   return Math.max(Number(last) + 1, start);
+}
+
+/** Values printed on the रसीद; `showPhone` decides how much of the mobile number appears. */
+export function receiptView(d, showPhone = formatPhone) {
+  const phone = donationPhone(d);
+  return {
+    ...d,
+    date_out: formatDate(d.paid_on, 'numeric'),
+    phone_out: phone ? showPhone(phone) : '',
+    residence: d.member_address || d.member_city || '',
+    amount_out: formatINR(d.amount_paise),
+    words_out: amountInWordsHi(d.amount_paise),
+    mode_out: [PAYMENT_MODE_LABEL[d.payment_mode] || d.payment_mode, d.reference].filter(Boolean).join(' — '),
+  };
+}
+
+/** The uploaded QR image, else a UPI payment QR generated from the UPI ID. */
+export async function receiptQr(site) {
+  if (site.receipt_qr) return site.receipt_qr;
+  if (!site.upi_id) return '';
+  const params = new URLSearchParams({ pa: site.upi_id, pn: site.org_name_en || site.org_name, cu: 'INR' });
+  return QRCode.toDataURL(`upi://pay?${params}`, { margin: 0, width: 240 });
+}
+
+/** The same रसीद as the print page, as a PDF for the donor (full mobile number: it is their own). */
+export async function receiptPdf(d, site) {
+  const html = await ejs.renderFile(RECEIPT_VIEW, {
+    site,
+    receipts: [receiptView(d)],
+    reasons: RECEIPT_REASONS,
+    qr: await receiptQr(site),
+    baseHref: `http://127.0.0.1:${PORT}/`,
+    single: true,
+  });
+  return htmlToReceiptPdf(html);
+}
+
+export const receiptFileName = (d) => `Receipt-${d.receipt_no}.pdf`;
+
+function withTimeout(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 export function thanksMessage(d, site) {
@@ -60,17 +111,27 @@ export async function sendDonationThanks(id) {
     await saveStatus.run({ id: d.id, status: 'no_phone', error: 'मोबाइल नंबर उपलब्ध नहीं है।' });
     return { ok: false, error: 'इस प्रविष्टि / सदस्य का मोबाइल नंबर उपलब्ध नहीं है।' };
   }
+  const site = await getSite();
   try {
-    let timer;
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error('व्हाट्सऐप से उत्तर नहीं मिला (समय समाप्त)।')), SEND_TIMEOUT_MS);
-    });
-    await Promise.race([sendWhatsApp(phone, thanksMessage(d, await getSite())), timeout]).finally(() => clearTimeout(timer));
-    await saveStatus.run({ id: d.id, status: 'sent', error: null });
-    return { ok: true };
+    await withTimeout(sendWhatsApp(phone, thanksMessage(d, site)), SEND_TIMEOUT_MS, 'व्हाट्सऐप से उत्तर नहीं मिला (समय समाप्त)।');
   } catch (err) {
     const error = String(err?.message || err).slice(0, 300);
     await saveStatus.run({ id: d.id, status: 'failed', error });
     return { ok: false, error };
   }
+  // The text has gone out; a PDF problem is reported but does not make the message "failed".
+  let pdfError = null;
+  try {
+    const send = async () =>
+      sendWhatsAppDocument(phone, {
+        buffer: await receiptPdf(d, site),
+        fileName: receiptFileName(d),
+        caption: `रसीद क्रमांक ${d.receipt_no} — ${site.org_name}`,
+      });
+    await withTimeout(send(), PDF_TIMEOUT_MS, 'PDF रसीद भेजने में बहुत देर हुई (समय समाप्त)।');
+  } catch (err) {
+    pdfError = String(err?.message || err).slice(0, 250);
+  }
+  await saveStatus.run({ id: d.id, status: 'sent', error: pdfError ? `PDF: ${pdfError}` : null });
+  return { ok: true, pdfError };
 }
