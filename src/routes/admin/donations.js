@@ -100,13 +100,29 @@ async function blankDonation(query) {
 /** Paise → "1500" or "1500.50" for the amount input. */
 const amountInput = (paise) => (paise % 100 === 0 ? String(paise / 100) : (paise / 100).toFixed(2));
 
-function renderForm(res, d, errors = []) {
+async function renderForm(res, d, errors = []) {
   res.status(errors.length ? 422 : 200).render('admin/donation-form', {
     pageTitle: d.id ? 'सहयोग प्रविष्टि संपादित करें' : 'नई सहयोग / भुगतान प्रविष्टि',
     d,
     errors,
     today: todayISO(),
+    nextNo: d.id ? null : await nextReceiptNo(),
   });
+}
+
+const receiptOwnerStmt = db.prepare('SELECT id, donor_name FROM donations WHERE receipt_no = ? AND id <> ?');
+
+/** Blank means "assign automatically" (new) or "keep as is" (edit). */
+async function parseReceiptNo(raw, existingId, errors) {
+  if (!raw) return null;
+  const n = /^\d{1,9}$/.test(raw) ? Number(raw) : 0;
+  if (!n) {
+    errors.push('रसीद क्रमांक 1 या उससे बड़ी पूर्ण संख्या होनी चाहिए।');
+    return null;
+  }
+  const owner = await receiptOwnerStmt.get(n, existingId || 0);
+  if (owner) errors.push(`रसीद क्रमांक ${n} पहले से ${owner.donor_name} की प्रविष्टि को दिया गया है — कोई दूसरा क्रमांक लिखें।`);
+  return n;
 }
 
 /**
@@ -134,8 +150,11 @@ async function parseDonation(body, existing = null) {
   const paidOn = isISODate(body.paid_on) ? body.paid_on : '';
   if (!paidOn) errors.push('भुगतान की तिथि दर्ज करें।');
   else if (paidOn > todayISO()) errors.push('भुगतान की तिथि भविष्य की नहीं हो सकती।');
+  const receiptRaw = str(body.receipt_no, 12);
+  const receiptNo = await parseReceiptNo(receiptRaw, existing?.id, errors);
 
   const v = {
+    receipt_no: receiptNo,
     member_id: member ? member.id : existing?.member_id ?? null,
     donor_name: donorName,
     category,
@@ -154,6 +173,7 @@ async function parseDonation(body, existing = null) {
     member_no: member?.member_no || existing?.member_no || '',
     amount: str(body.amount, 20),
     phone: phoneRaw,
+    receipt_no: receiptRaw,
   };
   return { v, errors, formValues };
 }
@@ -165,15 +185,22 @@ const insertDonation = db.prepare(
    VALUES (@member_id, @donor_name, @category, @amount_paise, @phone, @payment_mode, @reference, @details, @paid_on, @anonymous, @admin_id, @receipt_no)`
 );
 
-/** Two admins saving at the same moment can race for a रसीद क्रमांक; the unique index makes one retry. */
+const isDuplicateReceipt = (err) => err?.code === '23505';
+const duplicateReceiptError = (n) => `रसीद क्रमांक ${n} अभी-अभी किसी दूसरी प्रविष्टि को दिया गया — कोई दूसरा क्रमांक लिखें।`;
+
+/** Two admins saving at the same moment can race for an automatic रसीद क्रमांक; the unique index makes one retry. */
 async function insertWithReceiptNo(row) {
+  if (row.receipt_no) {
+    const info = await insertDonation.run(row);
+    return { id: Number(info.lastInsertRowid), receiptNo: row.receipt_no };
+  }
   for (let attempt = 1; ; attempt++) {
     const receiptNo = await nextReceiptNo();
     try {
       const info = await insertDonation.run({ ...row, receipt_no: receiptNo });
       return { id: Number(info.lastInsertRowid), receiptNo };
     } catch (err) {
-      if (err?.code !== '23505' || attempt >= 3) throw err;
+      if (!isDuplicateReceipt(err) || attempt >= 3) throw err;
     }
   }
 }
@@ -183,8 +210,16 @@ const whatsappNote = (result) =>
 
 router.post('/donations', async (req, res) => {
   const { v, errors, formValues } = await parseDonation(req.body ?? {});
-  if (errors.length) return renderForm(res, { ...formValues, send_whatsapp: bool(req.body?.send_whatsapp) }, errors);
-  const { id, receiptNo } = await insertWithReceiptNo({ ...v, admin_id: req.admin.id });
+  const again = { ...formValues, send_whatsapp: bool(req.body?.send_whatsapp) };
+  if (errors.length) return renderForm(res, again, errors);
+  let saved;
+  try {
+    saved = await insertWithReceiptNo({ ...v, admin_id: req.admin.id });
+  } catch (err) {
+    if (isDuplicateReceipt(err) && v.receipt_no) return renderForm(res, again, [duplicateReceiptError(v.receipt_no)]);
+    throw err;
+  }
+  const { id, receiptNo } = saved;
   let msg = `${v.donor_name} की ${formatINR(v.amount_paise)} की प्रविष्टि (${DONATION_CATEGORY_LABEL[v.category]}) सहेजी गई — रसीद क्रमांक ${receiptNo}।`;
   let type = 'success';
   if (bool(req.body?.send_whatsapp)) {
@@ -229,6 +264,7 @@ router.get('/donations/receipts', async (req, res) => {
     const d = await getDonation(id);
     if (d) rows.push(d);
   }
+  rows.sort((a, b) => a.receipt_no - b.receipt_no);
   if (!rows.length) {
     flash(req, 'error', 'रसीद प्रिंट करने के लिए कम से कम एक प्रविष्टि चुनें।');
     return res.redirect('/admin/donations');
@@ -253,21 +289,33 @@ router.get('/donations/receipts', async (req, res) => {
 router.get('/donations/:id/edit', async (req, res, next) => {
   const d = await getDonation(req.params.id);
   if (!d) return next();
-  renderForm(res, { ...d, amount: amountInput(d.amount_paise), phone: d.phone ? d.phone.slice(-10) : '' });
+  return renderForm(res, { ...d, amount: amountInput(d.amount_paise), phone: d.phone ? d.phone.slice(-10) : '' });
 });
+
+const updateDonation = db.prepare(
+  `UPDATE donations SET member_id = @member_id, donor_name = @donor_name, category = @category, amount_paise = @amount_paise,
+     phone = @phone, payment_mode = @payment_mode, reference = @reference, details = @details, paid_on = @paid_on, anonymous = @anonymous,
+     receipt_no = COALESCE(@receipt_no, receipt_no), updated_by = @updated_by, updated_at = CURRENT_TIMESTAMP
+   WHERE id = @id`
+);
 
 router.post('/donations/:id', async (req, res, next) => {
   const existing = await getDonation(req.params.id);
   if (!existing) return next();
   const { v, errors, formValues } = await parseDonation(req.body ?? {}, existing);
   if (errors.length) return renderForm(res, formValues, errors);
-  await db.prepare(
-    `UPDATE donations SET member_id = @member_id, donor_name = @donor_name, category = @category, amount_paise = @amount_paise,
-       phone = @phone, payment_mode = @payment_mode, reference = @reference, details = @details, paid_on = @paid_on, anonymous = @anonymous,
-       updated_by = @updated_by, updated_at = CURRENT_TIMESTAMP
-     WHERE id = @id`
-  ).run({ ...v, updated_by: req.admin.id, id: existing.id });
-  flash(req, 'success', 'प्रविष्टि अपडेट की गई।');
+  try {
+    await updateDonation.run({ ...v, updated_by: req.admin.id, id: existing.id });
+  } catch (err) {
+    if (isDuplicateReceipt(err) && v.receipt_no) return renderForm(res, formValues, [duplicateReceiptError(v.receipt_no)]);
+    throw err;
+  }
+  const finalNo = v.receipt_no || existing.receipt_no;
+  flash(
+    req,
+    'success',
+    finalNo !== existing.receipt_no ? `प्रविष्टि अपडेट की गई — रसीद क्रमांक ${existing.receipt_no} से ${finalNo} किया गया।` : 'प्रविष्टि अपडेट की गई।'
+  );
   res.redirect(`/admin/donations?category=${v.category}`);
 });
 

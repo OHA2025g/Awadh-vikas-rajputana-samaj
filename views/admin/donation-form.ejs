@@ -60,6 +60,15 @@
     </div>
 
     <div class="field">
+      <label for="f-receipt-no">रसीद क्रमांक (क्र. सं.)</label>
+      <input type="text" id="f-receipt-no" name="receipt_no" value="<%= d.receipt_no || '' %>" inputmode="numeric" maxlength="9" pattern="[0-9]+"
+             placeholder="<%= isNew ? 'अपने आप: ' + nextNo : '' %>" autocomplete="off">
+      <div class="hint">
+        <% if (isNew) { %>खाली छोड़ें तो अगला क्रमांक (<b><%= nextNo %></b>) अपने आप लगेगा। पुराने लेन-देन दर्ज करते समय अपनी रसीद-बुक का क्रमांक लिखें।<% } else { %>पुराने लेन-देन का क्रम ठीक करने के लिए क्रमांक बदलें। एक क्रमांक केवल एक प्रविष्टि को दिया जा सकता है।<% } %>
+      </div>
+    </div>
+
+    <div class="field">
       <label for="f-paid-on">भुगतान की तिथि <span class="req">*</span></label>
       <input type="date" id="f-paid-on" name="paid_on" value="<%= d.paid_on %>" max="<%= today %>" required>
     </div>

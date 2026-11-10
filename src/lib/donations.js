@@ -56,7 +56,7 @@ function buildWhere({ category, mode, from, to, q } = {}, { isPublic = false } =
   return { sql: where.length ? `WHERE ${where.join(' AND ')}` : '', params };
 }
 
-const ORDER = 'ORDER BY d.paid_on DESC, d.id DESC';
+const ORDER = 'ORDER BY d.paid_on DESC, d.receipt_no DESC, d.id DESC';
 
 export async function listDonations(filters, { limit = 50, offset = 0, isPublic = false } = {}) {
   const { sql, params } = buildWhere(filters, { isPublic });
