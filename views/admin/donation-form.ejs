@@ -75,8 +75,10 @@
 
     <div class="field" data-phone-field <%= d.category === 'daan' ? '' : 'hidden' %>>
       <label for="f-phone">मोबाइल नंबर</label>
-      <input type="tel" id="f-phone" name="phone" value="<%= d.phone || '' %>" inputmode="numeric" maxlength="14" placeholder="10 अंकों का मोबाइल नंबर" autocomplete="off" <%= d.category === 'daan' ? '' : 'disabled' %>>
-      <div class="hint"><%- icon('lock') %> यह नंबर केवल एडमिन पैनल में दिखेगा, वेबसाइट पर नहीं।</div>
+      <input type="tel" id="f-phone" name="phone" value="<%= d.phone || '' %>" inputmode="numeric" maxlength="14" autocomplete="off"
+             placeholder="<%= memberPhone.member_phone_hint ? 'सदस्य सूची का नंबर: ' + memberPhone.member_phone_hint : '10 अंकों का मोबाइल नंबर' %>"
+             data-auto-phone="<%= d.phone && d.phone === memberPhone.member_phone ? d.phone : '' %>" <%= d.category === 'daan' ? '' : 'disabled' %>>
+      <div class="hint"><%- icon('lock') %> सदस्य सूची से अपने आप भरता है; किसी दूसरे नंबर पर भेजना हो तो बदल दें। खाली छोड़ने पर सदस्य सूची का नंबर ही उपयोग होगा। यह नंबर केवल एडमिन पैनल में दिखेगा, वेबसाइट पर नहीं।</div>
     </div>
 
     <div class="field span-all">

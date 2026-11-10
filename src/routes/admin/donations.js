@@ -37,8 +37,18 @@ const PER_PAGE = 50;
 const queryString = (filters) =>
   new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== '' && v != null)).toString();
 
-const memberStmt = db.prepare('SELECT id, salutation, name, member_no, city, status FROM members WHERE id = ?');
+const memberStmt = db.prepare('SELECT id, salutation, name, member_no, city, status, phone, whatsapp FROM members WHERE id = ?');
 const memberLabel = (m) => [m.salutation, m.name].filter(Boolean).join(' ');
+
+/** Same preference as the thank-you message: WhatsApp number first, then mobile. */
+const memberContact = (m) => normalizePhone(m?.whatsapp) || normalizePhone(m?.phone);
+
+/** Sub-admins never receive a member's full number; they only see it masked. */
+function memberPhoneFields(m, isSuper) {
+  const phone = memberContact(m);
+  if (!phone) return { member_phone: '', member_phone_hint: '' };
+  return { member_phone: isSuper ? phone.slice(-10) : '', member_phone_hint: isSuper ? formatPhone(phone) : maskPhone(phone) };
+}
 
 router.get('/donations', async (req, res) => {
   const filters = donationFilters(req.query);
@@ -55,7 +65,7 @@ router.get('/donations', async (req, res) => {
   });
 });
 
-/** Approved members for the entry form's search box. Phone numbers are deliberately not returned. */
+/** Approved members for the entry form's search box. Full phone numbers go to super-admins only. */
 router.get('/donations/members', async (req, res) => {
   const q = str(req.query.q, 60);
   const where = q
@@ -63,7 +73,7 @@ router.get('/donations/members', async (req, res) => {
     : '';
   const rows = await db
     .prepare(
-      `SELECT m.id, m.salutation, m.name, m.member_no, m.city, md.name AS mandal_name,
+      `SELECT m.id, m.salutation, m.name, m.member_no, m.city, m.phone, m.whatsapp, md.name AS mandal_name,
               (SELECT COUNT(*) FROM donations d WHERE d.member_id = m.id AND d.category = 'lifetime') AS lifetime_count
        FROM members m LEFT JOIN mandals md ON md.id = m.mandal_id
        WHERE m.status = 'approved' ${where}
@@ -77,18 +87,19 @@ router.get('/donations/members', async (req, res) => {
       member_no: m.member_no || '',
       place: [m.city, m.mandal_name].filter(Boolean).join(' • '),
       lifetime_paid: m.lifetime_count > 0,
+      ...memberPhoneFields(m, res.locals.isSuper),
     })),
   });
 });
 
-async function blankDonation(query) {
+async function blankDonation(query, isSuper) {
   const member = int(query.member) ? await memberStmt.get(int(query.member)) : null;
   return {
     category: DONATION_CATEGORY_KEYS.includes(query.category) ? query.category : 'lifetime',
     payment_mode: 'cash',
     paid_on: todayISO(),
     amount: '',
-    phone: '',
+    phone: member?.status === 'approved' ? memberPhoneFields(member, isSuper).member_phone : '',
     reference: '',
     details: '',
     anonymous: 0,
@@ -101,7 +112,9 @@ async function blankDonation(query) {
 const amountInput = (paise) => (paise % 100 === 0 ? String(paise / 100) : (paise / 100).toFixed(2));
 
 async function renderForm(res, d, errors = []) {
+  const member = d.member_id ? await memberStmt.get(d.member_id) : null;
   res.status(errors.length ? 422 : 200).render('admin/donation-form', {
+    memberPhone: memberPhoneFields(member, res.locals.isSuper),
     pageTitle: d.id ? 'सहयोग प्रविष्टि संपादित करें' : 'नई सहयोग / भुगतान प्रविष्टि',
     d,
     errors,
@@ -178,7 +191,7 @@ async function parseDonation(body, existing = null) {
   return { v, errors, formValues };
 }
 
-router.get('/donations/new', async (req, res) => renderForm(res, await blankDonation(req.query)));
+router.get('/donations/new', async (req, res) => renderForm(res, await blankDonation(req.query, res.locals.isSuper)));
 
 const insertDonation = db.prepare(
   `INSERT INTO donations (member_id, donor_name, category, amount_paise, phone, payment_mode, reference, details, paid_on, anonymous, admin_id, receipt_no)

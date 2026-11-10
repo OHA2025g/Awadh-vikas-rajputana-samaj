@@ -118,6 +118,18 @@
     const input = $('input[type="search"]', donationPicker);
     const warn = $('[data-mp-lifetime]', donationPicker);
     let lifetimePaid = false;
+    const phoneBox = $('#f-phone', form);
+    const PHONE_PLACEHOLDER = '10 अंकों का मोबाइल नंबर';
+
+    /** Fill the mobile from the member list unless the admin typed a different number. */
+    const setMemberPhone = (m) => {
+      const typedByAdmin = phoneBox.value.trim() && phoneBox.value !== phoneBox.dataset.autoPhone;
+      if (!typedByAdmin) {
+        phoneBox.value = m?.member_phone || '';
+        phoneBox.dataset.autoPhone = phoneBox.value;
+      }
+      phoneBox.placeholder = m?.member_phone_hint ? `सदस्य सूची का नंबर: ${m.member_phone_hint}` : PHONE_PLACEHOLDER;
+    };
 
     const updateWarn = () => {
       warn.hidden = !(lifetimePaid && $('input[name="category"]:checked', form)?.value === 'lifetime');
@@ -134,6 +146,7 @@
         selected.hidden = false;
         searchBox.hidden = true;
         lifetimePaid = Boolean(m.lifetime_paid);
+        setMemberPhone(m);
         updateWarn();
         if (!$('#f-amount').disabled) $('#f-amount').focus();
       },
@@ -142,6 +155,7 @@
     $('[data-mp-change]', donationPicker).addEventListener('click', () => {
       hidden.value = '';
       lifetimePaid = false;
+      setMemberPhone(null);
       updateWarn();
       selected.hidden = true;
       searchBox.hidden = false;
