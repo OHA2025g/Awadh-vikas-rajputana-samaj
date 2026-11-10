@@ -1,8 +1,9 @@
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import ejs from 'ejs';
 import QRCode from 'qrcode';
 import { db } from '../db.js';
-import { DONATION_CATEGORY_LABEL, PAYMENT_MODE_LABEL, PORT, ROOT } from '../config.js';
+import { DONATION_CATEGORY_LABEL, PAYMENT_MODE_LABEL, ROOT, UPLOAD_DIR } from '../config.js';
 import { getDonation } from './donations.js';
 import { getSetting, getSite } from './settings.js';
 import { sendWhatsApp, sendWhatsAppDocument } from './whatsapp.js';
@@ -12,6 +13,16 @@ import { normalizePhone, formatINR, formatDate, formatPhone, amountInWordsHi } f
 const SEND_TIMEOUT_MS = 25_000;
 const PDF_TIMEOUT_MS = 45_000;
 const RECEIPT_VIEW = path.join(ROOT, 'views', 'admin', 'receipt-print.ejs');
+const RECEIPT_CSS = path.join(ROOT, 'public', 'css', 'receipt.css');
+const PUBLIC_DIR = path.join(ROOT, 'public');
+const IMAGE_TYPES = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+};
 
 /** Reasons in the order and wording of the printed रसीद. */
 export const RECEIPT_REASONS = [
@@ -55,14 +66,32 @@ export async function receiptQr(site) {
   return QRCode.toDataURL(`upi://pay?${params}`, { margin: 0, width: 240 });
 }
 
-/** The same रसीद as the print page, as a PDF for the donor (full mobile number: it is their own). */
+/** A site image path (`/uploads/…` or a file under public/) as a data URL; other values pass through. */
+async function embedImage(src) {
+  if (!src || !src.startsWith('/') || src.startsWith('//')) return src || '';
+  const rel = decodeURIComponent(src.split(/[?#]/)[0]);
+  const [base, sub] = rel.startsWith('/uploads/') ? [UPLOAD_DIR, rel.slice('/uploads/'.length)] : [PUBLIC_DIR, rel.slice(1)];
+  const file = path.resolve(base, sub);
+  const type = IMAGE_TYPES[path.extname(file).toLowerCase()];
+  if (!type || !file.startsWith(base + path.sep)) return '';
+  try {
+    return `data:${type};base64,${(await fs.readFile(file)).toString('base64')}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * The same रसीद as the print page, as a PDF for the donor (full mobile number: it is their own).
+ * Styles and images are embedded because the headless page cannot load them from this server.
+ */
 export async function receiptPdf(d, site) {
   const html = await ejs.renderFile(RECEIPT_VIEW, {
-    site,
+    site: { ...site, logo: await embedImage(site.logo) },
     receipts: [receiptView(d)],
     reasons: RECEIPT_REASONS,
-    qr: await receiptQr(site),
-    baseHref: `http://127.0.0.1:${PORT}/`,
+    qr: await embedImage(await receiptQr(site)),
+    inlineCss: await fs.readFile(RECEIPT_CSS, 'utf8'),
     single: true,
   });
   return htmlToReceiptPdf(html);
