@@ -9,7 +9,10 @@ export async function mandalNames() {
   return (await db.prepare('SELECT name FROM mandals ORDER BY sort_order, id').all()).map((r) => r.name);
 }
 
-const findByName = db.prepare('SELECT id, name FROM mandals WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) ORDER BY id LIMIT 1');
+/** Comparison key for a name: ड़ and other letters typed in different Unicode forms count as the same. */
+const nameKey = (expr) => `LOWER(normalize(TRIM(${expr}), NFC))`;
+
+const findByName = db.prepare(`SELECT id, name FROM mandals WHERE ${nameKey('name')} = ${nameKey('?')} ORDER BY id LIMIT 1`);
 const nameById = db.prepare('SELECT name FROM mandals WHERE id = ?');
 const insertMandal = db.prepare(
   'INSERT INTO mandals (name, sort_order) VALUES (?, (SELECT COALESCE(MAX(sort_order), 0) + 10 FROM mandals))'
@@ -17,7 +20,7 @@ const insertMandal = db.prepare(
 
 /** The मंडल id for a विधानसभा name, creating the मंडल the first time that name is used. */
 export async function mandalIdFor(vidhanSabha) {
-  const name = String(vidhanSabha ?? '').trim();
+  const name = String(vidhanSabha ?? '').normalize('NFC').trim();
   if (!name) return null;
   const found = await findByName.get(name);
   if (found) return found.id;
@@ -26,7 +29,10 @@ export async function mandalIdFor(vidhanSabha) {
 
 /** Makes a member row's mandal_id and vidhan_sabha agree; the written विधानसभा wins. */
 export async function alignMandal(v) {
-  if (String(v.vidhan_sabha ?? '').trim()) v.mandal_id = await mandalIdFor(v.vidhan_sabha);
+  if (String(v.vidhan_sabha ?? '').trim()) {
+    v.vidhan_sabha = v.vidhan_sabha.normalize('NFC');
+    v.mandal_id = await mandalIdFor(v.vidhan_sabha);
+  }
   else if (v.mandal_id) v.vidhan_sabha = (await nameById.get(v.mandal_id))?.name || null;
   return v;
 }
@@ -47,7 +53,7 @@ export async function setMembersMandal(ids, mandalId) {
  */
 export async function afterMandalRenamed(id, name) {
   const other = await db
-    .prepare('SELECT id FROM mandals WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) AND id <> ? ORDER BY id LIMIT 1')
+    .prepare(`SELECT id FROM mandals WHERE ${nameKey('name')} = ${nameKey('?')} AND id <> ? ORDER BY id LIMIT 1`)
     .get(name, id);
   const target = other ? other.id : id;
   await db.prepare('UPDATE members SET mandal_id = ?, vidhan_sabha = ? WHERE mandal_id IN (?, ?)').run(target, name, id, target);
@@ -84,8 +90,8 @@ export async function syncMemberPlaces() {
     .run();
   const names = await db
     .prepare(
-      `SELECT DISTINCT ON (LOWER(TRIM(vidhan_sabha))) TRIM(vidhan_sabha) AS name FROM members
-       WHERE COALESCE(TRIM(vidhan_sabha), '') <> '' ORDER BY LOWER(TRIM(vidhan_sabha)), id`
+      `SELECT DISTINCT ON (${nameKey('vidhan_sabha')}) TRIM(vidhan_sabha) AS name FROM members
+       WHERE COALESCE(TRIM(vidhan_sabha), '') <> '' ORDER BY ${nameKey('vidhan_sabha')}, id`
     )
     .all();
   for (const { name } of names) await mandalIdFor(name);
@@ -93,7 +99,7 @@ export async function syncMemberPlaces() {
     .prepare(
       `UPDATE members m SET mandal_id = md.id FROM mandals md
        WHERE COALESCE(TRIM(m.vidhan_sabha), '') <> ''
-         AND md.id = (SELECT MIN(x.id) FROM mandals x WHERE LOWER(TRIM(x.name)) = LOWER(TRIM(m.vidhan_sabha)))
+         AND md.id = (SELECT MIN(x.id) FROM mandals x WHERE ${nameKey('x.name')} = ${nameKey('m.vidhan_sabha')})
          AND m.mandal_id IS DISTINCT FROM md.id`
     )
     .run();
