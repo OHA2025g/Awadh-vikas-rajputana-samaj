@@ -4,7 +4,7 @@
   <div class="container">
     <div class="crumbs"><a href="/">मुखपृष्ठ</a> / सदस्य निर्देशिका</div>
     <h1>सदस्य निर्देशिका</h1>
-    <p>संघ के प्रमुख, पदाधिकारी एवं सभी सदस्यों की सूची — मंडल, समिति या नाम से खोजें।</p>
+    <p>संघ के पदाधिकारी, संस्थापक सदस्य एवं सभी सदस्यों की सूची — मंडल, समिति या नाम से खोजें।</p>
   </div>
 </section>
 
@@ -12,16 +12,16 @@
   <div class="container" id="directory-app" data-initial-category="<%= initialCategory %>">
     <div class="dir-tabs" role="tablist">
       <button class="dir-tab" type="button" data-category="" role="tab"><%- icon('grid') %> सभी <span class="count" data-count="all"><%= counts.all %></span></button>
-      <button class="dir-tab" type="button" data-category="pramukh" role="tab"><%- icon('award') %> प्रमुख <span class="count" data-count="pramukh"><%= counts.pramukh %></span></button>
-      <button class="dir-tab" type="button" data-category="padadhikari" role="tab"><%- icon('shield') %> पदाधिकारी <span class="count" data-count="padadhikari"><%= counts.padadhikari %></span></button>
-      <button class="dir-tab" type="button" data-category="sadasya" role="tab"><%- icon('users') %> सदस्य <span class="count" data-count="sadasya"><%= counts.sadasya %></span></button>
+      <% for (const c of CATEGORIES) { %>
+        <button class="dir-tab" type="button" data-category="<%= c.key %>" data-label="<%= c.label %>" role="tab"><%- icon(c.icon) %> <%= c.label %> <span class="count" data-count="<%= c.key %>"><%= counts[c.key] %></span></button>
+      <% } %>
     </div>
 
     <div class="filters">
       <label class="input-icon">
         <span class="sr-only">खोजें</span>
         <%- icon('search') %>
-        <input type="search" id="dir-q" placeholder="नाम, सदस्य क्रमांक या शहर से खोजें…" autocomplete="off">
+        <input type="search" id="dir-q" placeholder="नाम, सदस्य क्रमांक, मंडल या शहर से खोजें…" autocomplete="off">
       </label>
       <select id="dir-mandal" aria-label="मंडल">
         <option value="">सभी मंडल</option>

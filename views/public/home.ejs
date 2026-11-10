@@ -186,10 +186,9 @@
       <div class="container">
         <% head() %>
         <div class="cat-cards">
-          <% const catIcons = { pramukh: 'award', padadhikari: 'shield', sadasya: 'users' }; %>
           <% for (const c of CATEGORIES) { %>
             <a class="cat-card reveal" href="/directory?category=<%= c.key %>">
-              <%- icon(catIcons[c.key]) %>
+              <%- icon(c.icon) %>
               <strong><%= counts[c.key] %></strong>
               <h3><%= c.label %></h3>
               <p><%= c.desc %></p>

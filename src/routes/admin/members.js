@@ -389,7 +389,6 @@ const EXPORT_COLUMNS = [
   ['state', 'प्रदेश'],
   ['country', 'राष्ट्र'],
   ['pincode', 'पिनकोड (वर्तमान)'],
-  ['city', 'शहर / क्षेत्र'],
   ['family_out', 'पारिवारिक विवरण'],
   ['relatives_out', 'गाँव के रिलेशन'],
   ['native_place', 'पैतृक स्थान'],

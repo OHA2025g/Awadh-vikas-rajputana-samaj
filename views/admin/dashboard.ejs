@@ -5,18 +5,13 @@
 %>
 
 <div class="grid cols-4" style="margin-bottom:22px">
-  <a class="stat-card" href="/admin/members?category=pramukh">
-    <span class="si maroon"><%- icon('award') %></span>
-    <span><strong><%= counts.pramukh %></strong><span>प्रमुख</span></span>
-  </a>
-  <a class="stat-card" href="/admin/members?category=padadhikari">
-    <span class="si"><%- icon('shield') %></span>
-    <span><strong><%= counts.padadhikari %></strong><span>पदाधिकारी</span></span>
-  </a>
-  <a class="stat-card" href="/admin/members?category=sadasya">
-    <span class="si green"><%- icon('users') %></span>
-    <span><strong><%= counts.sadasya %></strong><span>सदस्य</span></span>
-  </a>
+  <% const statTone = { padadhikari: '', sansthapak: 'maroon', sadasya: 'green' }; %>
+  <% CATEGORIES.forEach((c) => { %>
+    <a class="stat-card" href="/admin/members?category=<%= c.key %>">
+      <span class="si <%= statTone[c.key] %>"><%- icon(c.icon) %></span>
+      <span><strong><%= counts[c.key] %></strong><span><%= c.label %></span></span>
+    </a>
+  <% }) %>
   <a class="stat-card" href="/admin/applications">
     <span class="si blue"><%- icon('user-check') %></span>
     <span><strong><%= badges.applications %></strong><span>लंबित आवेदन</span></span>

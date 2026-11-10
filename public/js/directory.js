@@ -20,8 +20,8 @@
   const qInput = $('#dir-q');
   const mandalSel = $('#dir-mandal');
   const committeeSel = $('#dir-committee');
-  const CAT_LABEL = { pramukh: 'प्रमुख', padadhikari: 'पदाधिकारी', sadasya: 'सदस्य' };
-  const CAT_TAG = { pramukh: 'maroon', padadhikari: '', sadasya: 'gold' };
+  const CAT_LABEL = Object.fromEntries($$('.dir-tab[data-label]').map((t) => [t.dataset.category, t.dataset.label]));
+  const CAT_TAG = { padadhikari: '', sansthapak: 'maroon', sadasya: 'gold' };
 
   qInput.value = state.q;
   mandalSel.value = state.mandal;

@@ -10,9 +10,9 @@ export const PORT = Number(process.env.PORT) || 3000;
 export const IS_PROD = process.env.NODE_ENV === 'production';
 
 export const CATEGORIES = [
-  { key: 'pramukh', label: 'प्रमुख', desc: 'संघ के मार्गदर्शक एवं प्रमुख पदों पर आसीन महानुभाव' },
-  { key: 'padadhikari', label: 'पदाधिकारी', desc: 'कार्यकारिणी, प्रकोष्ठ एवं समितियों के पदाधिकारी' },
-  { key: 'sadasya', label: 'सदस्य', desc: 'संघ के सभी आजीवन एवं सामान्य सदस्य' },
+  { key: 'padadhikari', label: 'पदाधिकारी', icon: 'shield', desc: 'कार्यकारिणी, प्रकोष्ठ एवं समितियों के पदाधिकारी' },
+  { key: 'sansthapak', label: 'संस्थापक सदस्य', icon: 'award', desc: 'संघ की स्थापना करने वाले सदस्य' },
+  { key: 'sadasya', label: 'सदस्य', icon: 'users', desc: 'संघ के सभी आजीवन एवं सामान्य सदस्य' },
 ];
 export const CATEGORY_KEYS = CATEGORIES.map((c) => c.key);
 export const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.key, c.label]));

@@ -2,8 +2,8 @@ import crypto from 'node:crypto';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { db } from '../db.js';
-import { POST_CATEGORIES, DONATION_CATEGORIES, PAYMENT_MODE_LABEL } from '../config.js';
-import { categoryCounts, findActiveByPhone, nextApplicationNo, toPublicMember, listMembers } from '../lib/members.js';
+import { CATEGORY_KEYS, POST_CATEGORIES, DONATION_CATEGORIES, PAYMENT_MODE_LABEL } from '../config.js';
+import { categoryCounts, findActiveByPhone, nextApplicationNo } from '../lib/members.js';
 import { donationFilters, donationTotals, listDonations } from '../lib/donations.js';
 import { parseFormFields } from '../lib/membership-form.js';
 import { alignMandal, mandalNames } from '../lib/mandals.js';
@@ -53,7 +53,6 @@ router.get('/', async (req, res) => {
     )
     .all();
   const counts = await categoryCounts({ publicOnly: true });
-  const featured = (await listMembers({ publicOnly: true, category: 'pramukh' }, { limit: 4 })).rows.map(toPublicMember);
   const stats = {
     members: counts.all,
     mandals: (await db.prepare('SELECT COUNT(*) AS n FROM mandals').get()).n,
@@ -68,7 +67,6 @@ router.get('/', async (req, res) => {
     past,
     posts,
     counts,
-    featured,
     stats,
     mandals: await mandalsStmt.all(),
   });
@@ -82,7 +80,7 @@ router.get('/directory', async (req, res) => {
     mandals: await mandalsStmt.all(),
     committees: await committeesStmt.all(),
     counts: await categoryCounts({ publicOnly: true }),
-    initialCategory: ['pramukh', 'padadhikari', 'sadasya'].includes(req.query.category) ? req.query.category : '',
+    initialCategory: CATEGORY_KEYS.includes(req.query.category) ? req.query.category : '',
   });
 });
 

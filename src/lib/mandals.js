@@ -59,12 +59,27 @@ export async function mandalMemberCount(id) {
   return Number((await db.prepare('SELECT COUNT(*) AS n FROM members WHERE mandal_id = ?').get(id)).n);
 }
 
-/** Startup backfill: fills empty विधानसभा from the assigned मंडल, then links every member to their विधानसभा's मंडल. */
-export async function syncMandals() {
+const CITY_FROM_DISTRICT = "COALESCE(NULLIF(TRIM(perm_district), ''), NULLIF(TRIM(district), ''))";
+
+/**
+ * Startup backfill. Fills an empty विधानसभा from the assigned मंडल, or else from शहर (which used to
+ * default to the विधानसभा), links every member to their विधानसभा's मंडल, then sets शहर to the
+ * स्थायी पते का जिला. Once शहर holds a जिला the शहर → विधानसभा step no longer matches, so this is
+ * safe to run on every start.
+ */
+export async function syncMemberPlaces() {
   await db
     .prepare(
       `UPDATE members m SET vidhan_sabha = md.name FROM mandals md
        WHERE md.id = m.mandal_id AND COALESCE(TRIM(m.vidhan_sabha), '') = ''`
+    )
+    .run();
+  await db
+    .prepare(
+      `UPDATE members SET vidhan_sabha = TRIM(city)
+       WHERE COALESCE(TRIM(vidhan_sabha), '') = '' AND COALESCE(TRIM(city), '') <> ''
+         AND LOWER(TRIM(city)) <> LOWER(COALESCE(TRIM(district), ''))
+         AND LOWER(TRIM(city)) <> LOWER(COALESCE(TRIM(perm_district), ''))`
     )
     .run();
   const names = await db
@@ -82,4 +97,5 @@ export async function syncMandals() {
          AND m.mandal_id IS DISTINCT FROM md.id`
     )
     .run();
+  await db.prepare(`UPDATE members SET city = ${CITY_FROM_DISTRICT} WHERE city IS DISTINCT FROM ${CITY_FROM_DISTRICT}`).run();
 }

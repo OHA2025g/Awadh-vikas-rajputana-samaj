@@ -121,7 +121,7 @@ router.get('/meetings/members', async (req, res) => {
       `SELECT m.id, m.salutation, m.name, m.member_no, m.designation, c.name AS committee_name
        FROM members m LEFT JOIN committees c ON c.id = m.committee_id
        WHERE ${where.join(' AND ')}
-       ORDER BY CASE m.category WHEN 'pramukh' THEN 0 WHEN 'padadhikari' THEN 1 ELSE 2 END, m.sort_order, m.name COLLATE NOCASE
+       ORDER BY CASE m.category WHEN 'padadhikari' THEN 0 WHEN 'sansthapak' THEN 1 ELSE 2 END, m.sort_order, m.name COLLATE NOCASE
        LIMIT ${committee && !q ? 200 : 20}`
     )
     .all(params);

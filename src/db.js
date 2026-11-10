@@ -429,6 +429,11 @@ async function initSchema() {
      WHERE d.id = n.id`
   );
   await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_donations_receipt ON donations(receipt_no)');
+  await pool.query("UPDATE members SET category = 'padadhikari' WHERE category = 'pramukh'");
+  await pool.query(
+    `UPDATE sections SET subtitle = 'पदाधिकारी, संस्थापक सदस्य एवं सभी सदस्य — मंडल व समिति अनुसार'
+     WHERE slug = 'directory' AND subtitle = 'प्रमुख, पदाधिकारी एवं सभी सदस्य — मंडल व समिति अनुसार'`
+  );
 }
 
 await initSchema();

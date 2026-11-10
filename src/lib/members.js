@@ -9,7 +9,7 @@ const BASE_SELECT = `
   LEFT JOIN mandals md ON md.id = m.mandal_id
   LEFT JOIN committees c ON c.id = m.committee_id`;
 
-const CATEGORY_ORDER = `CASE m.category WHEN 'pramukh' THEN 0 WHEN 'padadhikari' THEN 1 ELSE 2 END`;
+const CATEGORY_ORDER = `CASE m.category WHEN 'padadhikari' THEN 0 WHEN 'sansthapak' THEN 1 ELSE 2 END`;
 
 export function likeTerm(q) {
   return `%${String(q).replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
@@ -42,7 +42,7 @@ function buildWhere({ status, category, mandal, committee, q, publicOnly, ids, c
   }
   if (q) {
     where.push(
-      `(m.name ILIKE @q ESCAPE E'\\\\' OR m.name_en ILIKE @q ESCAPE E'\\\\' OR m.member_no ILIKE @q ESCAPE E'\\\\' OR m.city ILIKE @q ESCAPE E'\\\\' OR m.application_no ILIKE @q ESCAPE E'\\\\' OR m.designation ILIKE @q ESCAPE E'\\\\')`
+      `(m.name ILIKE @q ESCAPE E'\\\\' OR m.name_en ILIKE @q ESCAPE E'\\\\' OR m.member_no ILIKE @q ESCAPE E'\\\\' OR m.city ILIKE @q ESCAPE E'\\\\' OR m.vidhan_sabha ILIKE @q ESCAPE E'\\\\' OR m.application_no ILIKE @q ESCAPE E'\\\\' OR m.designation ILIKE @q ESCAPE E'\\\\')`
     );
     params.q = likeTerm(q);
   }

@@ -32,9 +32,7 @@
         <ul class="footer-links">
           <li><a href="/join">ऑनलाइन आवेदन</a></li>
           <li><a href="/status">आवेदन की स्थिति</a></li>
-          <li><a href="/directory?category=pramukh">प्रमुख</a></li>
-          <li><a href="/directory?category=padadhikari">पदाधिकारी</a></li>
-          <li><a href="/directory?category=sadasya">सदस्य</a></li>
+          <% for (const c of CATEGORIES) { %><li><a href="/directory?category=<%= c.key %>"><%= c.label %></a></li><% } %>
           <li><a href="/wall">सामुदायिक मंच</a></li>
         </ul>
       </div>

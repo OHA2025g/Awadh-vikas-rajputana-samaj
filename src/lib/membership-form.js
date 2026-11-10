@@ -65,7 +65,7 @@ export function parseFormFields(body, { strict = false } = {}) {
   };
   v.family = JSON.stringify(parseRows(body, 'family', FAMILY_ROWS, false, errors));
   v.relatives = JSON.stringify(parseRows(body, 'relative', RELATIVE_ROWS, true, errors));
-  v.city = str(body.city, 60) || v.vidhan_sabha || v.district || null;
+  v.city = v.perm_district || v.district || null;
   v.native_place = str(body.native_place, 100) || [v.perm_village, v.perm_district].filter(Boolean).join(', ') || null;
 
   if (v.name.length < 2) errors.name = 'कृपया सदस्य का पूरा नाम लिखें।';

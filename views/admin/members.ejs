@@ -1,8 +1,8 @@
 <%- include('../partials/admin-top') %>
 <%
   const phoneOut = isSuper ? formatPhone : maskPhone;
-  const catBadge = { pramukh: 'maroon', padadhikari: 'gold', sadasya: 'green' };
-  const catIcon = { pramukh: 'award', padadhikari: 'shield', sadasya: 'users' };
+  const catBadge = { padadhikari: 'gold', sansthapak: 'maroon', sadasya: 'green' };
+  const catIcon = Object.fromEntries(CATEGORIES.map((c) => [c.key, c.icon]));
   const tabQs = (cat) => {
     const p = new URLSearchParams(qs);
     p.delete('page');

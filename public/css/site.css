@@ -1264,7 +1264,7 @@ p {
   box-shadow: var(--shadow);
 }
 
-.member-card.pramukh {
+.member-card.sansthapak {
   border-top: 4px solid var(--maroon);
 }
 
@@ -1293,7 +1293,7 @@ p {
   flex-shrink: 0;
 }
 
-.member-card.pramukh .avatar {
+.member-card.sansthapak .avatar {
   width: 112px;
   height: 112px;
   box-shadow: 0 0 0 3px var(--gold);
